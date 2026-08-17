@@ -1,4 +1,4 @@
-import { LogOut, Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TourMenuItem } from "@/features/product-tour";
 import { MobileSidebar } from "./mobile-sidebar";
+import { SignOutMenuItem } from "./sign-out-menu-item";
 
 type TopNavProps = {
   clinicName?: string;
@@ -47,10 +48,7 @@ export function TopNav({ clinicName, doctorName }: TopNavProps) {
           </DropdownMenuItem>
           <TourMenuItem />
           <DropdownMenuSeparator />
-          <DropdownMenuItem render={<Link href="/" />}>
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </DropdownMenuItem>
+          <SignOutMenuItem />
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

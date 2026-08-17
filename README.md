@@ -11,16 +11,31 @@ patients to install, no scheduling software for staff to learn.
    `brew services start postgresql@18` (or whichever version you have), then
    `createdb cliain_dev`.
 2. **Env vars** — `cp .env.example .env.local` and fill in `DATABASE_URL` and
-   `ANTHROPIC_API_KEY` at minimum. WhatsApp/Google Calendar/Vapi vars can stay
+   `ANTHROPIC_API_KEY` at minimum. Set `DASHBOARD_PASSWORD` and
+   `SESSION_SECRET` too if you want to actually reach `/dashboard` (see
+   "Dashboard login" below) — WhatsApp/Google Calendar/Vapi vars can stay
    blank until you're ready to wire those up (see below).
 3. **Migrate** — `npx prisma migrate dev`
 4. **Run** — `npm run dev`
 
 Open [http://localhost:3000](http://localhost:3000) — the landing page. Click
 **Get started** to walk through onboarding (writes a real `Doctor` +
-`WorkingHours` record to Postgres), which lands you on `/dashboard`. A guided
-tour of the dashboard runs automatically on first visit, and again anytime
-from the account menu → **Take a tour**.
+`WorkingHours` record to Postgres), which lands you on `/dashboard` — you'll
+be asked to sign in first if `DASHBOARD_PASSWORD`/`SESSION_SECRET` are set. A
+guided tour of the dashboard runs automatically on first visit, and again
+anytime from the account menu → **Take a tour**.
+
+### Dashboard login
+
+`/dashboard/*` and its sensitive APIs (Settings/Integrations, Appointments,
+Patients) are gated behind a single shared password — there's no per-user
+accounts yet, matching the rest of the app's single-clinic MVP scope. Set
+`DASHBOARD_PASSWORD` (whatever you want) and `SESSION_SECRET` (generate with
+`openssl rand -base64 32`) in `.env.local`, then sign in at `/login`. Without
+both set, `/login` shows a "not configured" message instead of a password
+field, and the dashboard stays unreachable. The public landing page and the
+onboarding wizard (`/onboarding`) are intentionally left open — see
+`src/proxy.ts` for exactly what's gated and why.
 
 ### Try the AI booking agent without WhatsApp
 
