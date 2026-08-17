@@ -1,23 +1,20 @@
 import "server-only";
 import type { Doctor } from "@prisma/client";
-import { env } from "@/lib/env";
+import { getVapiConfig } from "@/lib/integration-credentials";
 import { AGENT_MODEL } from "@/lib/anthropic";
 import { AGENT_TOOLS } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
 
 const VAPI_API_BASE = "https://api.vapi.ai";
 
-function requireVapiConfig() {
-  if (!env.VAPI_API_KEY || !env.VAPI_PHONE_NUMBER_ID || !env.VAPI_TOOL_WEBHOOK_URL) {
+async function requireVapiConfig() {
+  const config = await getVapiConfig();
+  if (!config) {
     throw new Error(
-      "Vapi is not configured — set VAPI_API_KEY, VAPI_PHONE_NUMBER_ID, and VAPI_TOOL_WEBHOOK_URL in .env.local.",
+      "Vapi is not configured — connect it from Settings, or set VAPI_API_KEY, VAPI_PHONE_NUMBER_ID, and VAPI_TOOL_WEBHOOK_URL in .env.local.",
     );
   }
-  return {
-    apiKey: env.VAPI_API_KEY,
-    phoneNumberId: env.VAPI_PHONE_NUMBER_ID,
-    webhookUrl: env.VAPI_TOOL_WEBHOOK_URL,
-  };
+  return config;
 }
 
 // Vapi's own model (configured as our same Claude model below) drives the live conversation
@@ -61,7 +58,7 @@ export type PlaceCallResult = { ok: true; callId: string } | { ok: false; error:
 /** Places an outbound call. Best-effort — never throws; callers decide how to handle failure. */
 export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCallResult> {
   try {
-    const { apiKey, phoneNumberId, webhookUrl } = requireVapiConfig();
+    const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig();
 
     const response = await fetch(`${VAPI_API_BASE}/call`, {
       method: "POST",

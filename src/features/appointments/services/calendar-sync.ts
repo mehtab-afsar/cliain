@@ -1,22 +1,11 @@
 import "server-only";
-import { readFileSync } from "node:fs";
 import { google } from "googleapis";
-import { env } from "@/lib/env";
+import { getGoogleServiceAccountCredentials } from "@/lib/integration-credentials";
 
 const CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
-function loadServiceAccountCredentials(): { client_email: string; private_key: string } | null {
-  if (env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    return JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
-  }
-  if (env.GOOGLE_SERVICE_ACCOUNT_FILE) {
-    return JSON.parse(readFileSync(env.GOOGLE_SERVICE_ACCOUNT_FILE, "utf-8"));
-  }
-  return null;
-}
-
-function getCalendarClient() {
-  const credentials = loadServiceAccountCredentials();
+async function getCalendarClient() {
+  const credentials = await getGoogleServiceAccountCredentials();
   if (!credentials) return null;
 
   const auth = new google.auth.JWT({
@@ -43,7 +32,7 @@ type EventDetails = {
 /** Best-effort: Postgres is the source of truth, Calendar is a one-way mirror. Never throws. */
 export async function createCalendarEvent(details: EventDetails): Promise<CalendarSyncResult> {
   try {
-    const calendar = getCalendarClient();
+    const calendar = await getCalendarClient();
     if (!calendar) return { ok: false, error: "Google Calendar is not configured." };
 
     const response = await calendar.events.insert({
@@ -69,7 +58,7 @@ export async function updateCalendarEvent(
   patch: { startAt: Date; endAt: Date; timezone: string },
 ): Promise<CalendarSyncResult> {
   try {
-    const calendar = getCalendarClient();
+    const calendar = await getCalendarClient();
     if (!calendar) return { ok: false, error: "Google Calendar is not configured." };
 
     await calendar.events.patch({
@@ -91,7 +80,7 @@ export async function deleteCalendarEvent(
   eventId: string,
 ): Promise<CalendarSyncResult> {
   try {
-    const calendar = getCalendarClient();
+    const calendar = await getCalendarClient();
     if (!calendar) return { ok: false, error: "Google Calendar is not configured." };
 
     await calendar.events.delete({ calendarId, eventId });

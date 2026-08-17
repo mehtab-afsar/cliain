@@ -18,6 +18,17 @@ model Doctor {
   appointments  Appointment[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  // Integration credentials — set from Settings → Integrations, encrypted at rest.
+  // Falls back to env vars (see src/lib/env.ts) when unset, so an existing .env.local
+  // deployment keeps working without visiting Settings.
+  whatsappPhoneNumberId   String?
+  whatsappAccessToken     String?
+  whatsappVerifyToken     String?
+  vapiApiKey              String?
+  vapiPhoneNumberId       String?
+  vapiToolWebhookUrl      String?
+  googleServiceAccountJson String? @db.Text
 }
 
 model WorkingHours {

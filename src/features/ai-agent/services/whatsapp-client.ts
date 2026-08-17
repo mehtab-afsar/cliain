@@ -1,18 +1,16 @@
 import "server-only";
-import { env } from "@/lib/env";
+import { getWhatsappConfig } from "@/lib/integration-credentials";
 
 const GRAPH_API_VERSION = "v21.0";
 
-function requireWhatsappConfig() {
-  if (!env.WHATSAPP_PHONE_NUMBER_ID || !env.WHATSAPP_ACCESS_TOKEN) {
+async function requireWhatsappConfig() {
+  const config = await getWhatsappConfig();
+  if (!config) {
     throw new Error(
-      "WhatsApp is not configured — set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN in .env.local.",
+      "WhatsApp is not configured — connect it from Settings, or set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN in .env.local.",
     );
   }
-  return {
-    phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
-    accessToken: env.WHATSAPP_ACCESS_TOKEN,
-  };
+  return config;
 }
 
 async function callGraphApi(phoneNumberId: string, accessToken: string, body: unknown) {
@@ -36,7 +34,7 @@ async function callGraphApi(phoneNumberId: string, accessToken: string, body: un
 
 /** Free-form reply — only valid within the 24h window opened by an inbound patient message. */
 export async function sendWhatsappText(to: string, body: string) {
-  const { phoneNumberId, accessToken } = requireWhatsappConfig();
+  const { phoneNumberId, accessToken } = await requireWhatsappConfig();
   return callGraphApi(phoneNumberId, accessToken, {
     messaging_product: "whatsapp",
     to,
@@ -52,7 +50,7 @@ export async function sendWhatsappTemplate(
   languageCode: string,
   bodyParameters: string[],
 ) {
-  const { phoneNumberId, accessToken } = requireWhatsappConfig();
+  const { phoneNumberId, accessToken } = await requireWhatsappConfig();
   return callGraphApi(phoneNumberId, accessToken, {
     messaging_product: "whatsapp",
     to,

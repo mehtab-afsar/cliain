@@ -79,23 +79,41 @@ types per feature).
 
 ## What needs real credentials to actually work
 
-- **Anthropic** — set `ANTHROPIC_API_KEY`. Without it, `/api/ai/chat` and the
-  WhatsApp webhook return a clear error instead of crashing.
+**Anthropic** is env-var only — set `ANTHROPIC_API_KEY`. Without it,
+`/api/ai/chat` and the WhatsApp webhook return a clear error instead of
+crashing.
+
+**WhatsApp, Vapi, and Google Calendar** can each be connected two ways:
+
+- **Self-serve, from the dashboard** — `/dashboard/settings` → Integrations.
+  Credentials are encrypted (AES-256-GCM) and stored on the `Doctor` row in
+  Postgres. Requires `INTEGRATION_ENCRYPTION_KEY` to be set (generate one
+  with `openssl rand -base64 32`) — without it, saving a credential from
+  Settings fails with a clear error.
+- **Env vars**, as before — set the vars below in `.env.local`. These act as
+  a fallback: a value saved in Settings always wins over the matching env
+  var, so you can mix both (e.g. `ANTHROPIC_API_KEY` in env, WhatsApp
+  connected via Settings).
+
+Either way, you'll still need the credentials themselves from each provider:
+
 - **WhatsApp Cloud API** — create a Meta App with the WhatsApp product (free
-  test number, no business verification needed to start), set
-  `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`.
+  test number, no business verification needed to start) to get a phone
+  number ID and access token (`WHATSAPP_PHONE_NUMBER_ID`,
+  `WHATSAPP_ACCESS_TOKEN`), plus a verify token you make up yourself
+  (`WHATSAPP_VERIFY_TOKEN`, echoed back by Meta during the webhook handshake).
   Point the webhook at `/api/webhooks/whatsapp` (tunnel with `ngrok`/
   `cloudflared` for local testing).
 - **Google Calendar** — create a Google Cloud project, enable the Calendar
-  API, create a Service Account, download its JSON key. Set
-  `GOOGLE_SERVICE_ACCOUNT_JSON` (paste the JSON) or
-  `GOOGLE_SERVICE_ACCOUNT_FILE` (path to the key file). Share a calendar with
-  the service account's email, then set that calendar's ID on the `Doctor`
-  row (`googleCalendarId` — not yet exposed in onboarding UI; set directly via
-  `npx prisma studio` for now).
+  API, create a Service Account, download its JSON key
+  (`GOOGLE_SERVICE_ACCOUNT_JSON`, or `GOOGLE_SERVICE_ACCOUNT_FILE` for a file
+  path instead — env-var-only, no dashboard equivalent for the file-path
+  form). Share a calendar with the service account's email, then set that
+  calendar's ID (`googleCalendarId`) — from Settings, or via
+  `npx prisma studio`.
 - **Vapi (voice)** — create an account at vapi.ai, buy/connect a phone number,
-  set `VAPI_API_KEY` and `VAPI_PHONE_NUMBER_ID`. Set `VAPI_TOOL_WEBHOOK_URL`
-  to a public URL for `/api/webhooks/vapi` (tunnel locally, same as
+  to get `VAPI_API_KEY` and `VAPI_PHONE_NUMBER_ID`. `VAPI_TOOL_WEBHOOK_URL`
+  needs to be a public URL for `/api/webhooks/vapi` (tunnel locally, same as
   WhatsApp). The exact webhook payload shape was built from Vapi's docs but
   not verified against a live account — if `resolvePatientPhone` in
   `src/app/api/webhooks/vapi/route.ts` can't find the number on a real call,

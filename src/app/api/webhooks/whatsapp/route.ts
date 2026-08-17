@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { env } from "@/lib/env";
+import { getWhatsappVerifyToken } from "@/lib/integration-credentials";
 import {
   handleInboundMessage,
   parseInboundMessage,
@@ -11,8 +11,9 @@ export async function GET(request: Request) {
   const mode = url.searchParams.get("hub.mode");
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
+  const verifyToken = await getWhatsappVerifyToken();
 
-  if (mode === "subscribe" && token && env.WHATSAPP_VERIFY_TOKEN && token === env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === "subscribe" && token && verifyToken && token === verifyToken) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
   return new NextResponse("Forbidden", { status: 403 });

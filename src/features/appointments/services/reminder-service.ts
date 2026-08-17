@@ -3,7 +3,7 @@ import { DateTime } from "luxon";
 import { db } from "@/lib/db";
 import { sendWhatsappTemplate } from "@/features/ai-agent/services/whatsapp-client";
 import { placeOutboundCall } from "@/features/ai-agent/services/vapi-client";
-import { env } from "@/lib/env";
+import { getVapiConfig } from "@/lib/integration-credentials";
 
 // Text goes out further ahead as a heads-up; a call goes out closer to the appointment as a
 // stronger nudge (and lets the patient reschedule/cancel by voice on the spot). Both are
@@ -35,6 +35,8 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
       include: { patient: true, doctor: true },
     });
 
+    const vapiConfigured = window.voiceCall ? Boolean(await getVapiConfig()) : false;
+
     for (const appointment of dueAppointments) {
       const local = DateTime.fromJSDate(appointment.startAt, {
         zone: appointment.doctor.timezone,
@@ -58,7 +60,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
         );
       }
 
-      if (window.voiceCall && env.VAPI_API_KEY) {
+      if (vapiConfigured) {
         const call = await placeOutboundCall({
           doctor: appointment.doctor,
           toPhone: appointment.patient.phone,

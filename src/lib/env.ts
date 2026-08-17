@@ -11,6 +11,7 @@ const envSchema = z.object({
   VAPI_API_KEY: z.string().optional(),
   VAPI_PHONE_NUMBER_ID: z.string().optional(),
   VAPI_TOOL_WEBHOOK_URL: z.string().optional(),
+  INTEGRATION_ENCRYPTION_KEY: z.string().optional(),
 });
 
 function undefinedIfEmpty(value: string | undefined): string | undefined {
@@ -28,4 +29,5 @@ export const env = envSchema.parse({
   VAPI_API_KEY: undefinedIfEmpty(process.env.VAPI_API_KEY),
   VAPI_PHONE_NUMBER_ID: undefinedIfEmpty(process.env.VAPI_PHONE_NUMBER_ID),
   VAPI_TOOL_WEBHOOK_URL: undefinedIfEmpty(process.env.VAPI_TOOL_WEBHOOK_URL),
+  INTEGRATION_ENCRYPTION_KEY: undefinedIfEmpty(process.env.INTEGRATION_ENCRYPTION_KEY),
 });
