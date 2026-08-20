@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getSavedClinic } from "../services/clinic-service";
 import {
   createEmptyDraft,
   getDraft,
@@ -15,7 +16,14 @@ import {
   type WorkingHoursDay,
 } from "../types";
 
-function validateStep(stepIndex: number, draft: OnboardingDraft): string | null {
+const SECURITY_STEP_INDEX = ONBOARDING_STEPS.indexOf("security");
+
+function validateStep(
+  stepIndex: number,
+  draft: OnboardingDraft,
+  security: { password: string; confirmPassword: string },
+  isExistingClinic: boolean,
+): string | null {
   if (stepIndex === 0) {
     if (!draft.clinicBasics.clinicName.trim()) return "Enter your clinic's name.";
     if (!draft.clinicBasics.timezone.trim()) return "Select a timezone.";
@@ -32,23 +40,45 @@ function validateStep(stepIndex: number, draft: OnboardingDraft): string | null 
     if (invalidDay) return `${invalidDay.label}'s closing time must be after opening time.`;
     return null;
   }
+  if (stepIndex === SECURITY_STEP_INDEX) {
+    if (!security.password && !security.confirmPassword) {
+      return isExistingClinic ? null : "Set a password to protect your dashboard.";
+    }
+    if (security.password.length < 8) return "Password must be at least 8 characters.";
+    if (security.password !== security.confirmPassword) return "Passwords don't match.";
+    return null;
+  }
   return null;
 }
 
 export function useOnboardingFlow() {
   const [draft, setDraft] = useState<OnboardingDraft>(createEmptyDraft);
+  const [isExistingClinic, setIsExistingClinic] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Hydrating from localStorage (client-only) after mount, not derived state.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Loading the persisted clinic (if any) or falling back to the in-progress local draft —
+  // client-only, so a refresh mid-flow doesn't lose progress.
   useEffect(() => {
-    setDraft(getDraft());
-    setIsHydrated(true);
+    let cancelled = false;
+    getSavedClinic().then((saved) => {
+      if (cancelled) return;
+      if (saved) {
+        setDraft(saved);
+        setIsExistingClinic(true);
+      } else {
+        setDraft(getDraft());
+      }
+      setIsHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (isHydrated) saveDraft(draft);
@@ -74,8 +104,21 @@ export function useOnboardingFlow() {
     [],
   );
 
+  const updateSecurity = useCallback(
+    (patch: { password?: string; confirmPassword?: string }) => {
+      if (patch.password !== undefined) setPassword(patch.password);
+      if (patch.confirmPassword !== undefined) setConfirmPassword(patch.confirmPassword);
+    },
+    [],
+  );
+
   const goNext = useCallback(() => {
-    const validationError = validateStep(stepIndex, draft);
+    const validationError = validateStep(
+      stepIndex,
+      draft,
+      { password, confirmPassword },
+      isExistingClinic,
+    );
     if (validationError) {
       setError(validationError);
       return false;
@@ -83,7 +126,7 @@ export function useOnboardingFlow() {
     setError(null);
     setStepIndex((index) => Math.min(index + 1, ONBOARDING_STEPS.length - 1));
     return true;
-  }, [stepIndex, draft]);
+  }, [stepIndex, draft, password, confirmPassword, isExistingClinic]);
 
   const goBack = useCallback(() => {
     setError(null);
@@ -91,10 +134,20 @@ export function useOnboardingFlow() {
   }, []);
 
   const finish = useCallback(async () => {
+    const validationError = validateStep(
+      stepIndex,
+      draft,
+      { password, confirmPassword },
+      isExistingClinic,
+    );
+    if (validationError) {
+      setError(validationError);
+      return null;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
-      const completed = await submitOnboarding(draft);
+      const completed = await submitOnboarding(draft, password || undefined);
       setDraft(completed);
       return completed;
     } catch {
@@ -103,7 +156,7 @@ export function useOnboardingFlow() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [draft]);
+  }, [draft, password, confirmPassword, stepIndex, isExistingClinic]);
 
   return {
     draft,
@@ -113,9 +166,13 @@ export function useOnboardingFlow() {
     error,
     isHydrated,
     isSubmitting,
+    isExistingClinic,
+    password,
+    confirmPassword,
     updateClinicBasics,
     updateDoctorProfile,
     updateWorkingHoursDay,
+    updateSecurity,
     goNext,
     goBack,
     finish,

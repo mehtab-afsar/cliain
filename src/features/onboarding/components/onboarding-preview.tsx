@@ -71,7 +71,7 @@ export function OnboardingPreview({ draft, stepIndex }: OnboardingPreviewProps) 
         title={clinicName}
         subtitle="via WhatsApp"
         badge={
-          stepIndex === 3 ? (
+          stepIndex >= 3 ? (
             <span className="flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
               <Check className="h-3 w-3" />
               Confirmed

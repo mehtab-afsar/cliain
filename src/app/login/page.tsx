@@ -1,6 +1,7 @@
 import { LoginView } from "@/features/login";
 import { isLoginConfigured } from "@/lib/session";
 
-export default function LoginPage() {
-  return <LoginView isConfigured={isLoginConfigured()} />;
+export default async function LoginPage() {
+  const isConfigured = await isLoginConfigured();
+  return <LoginView isConfigured={isConfigured} />;
 }

@@ -29,6 +29,10 @@ model Doctor {
   vapiPhoneNumberId       String?
   vapiToolWebhookUrl      String?
   googleServiceAccountJson String? @db.Text
+
+  // Dashboard login — set during onboarding's last step, hashed (scrypt). Falls back to
+  // DASHBOARD_PASSWORD env var when unset (see src/lib/session.ts).
+  passwordHash String?
 }
 
 model WorkingHours {

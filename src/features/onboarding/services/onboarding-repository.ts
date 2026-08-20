@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { hashPassword } from "@/lib/password";
 import type { Doctor, WorkingHours } from "@prisma/client";
 import type { OnboardingDraft } from "../types";
 import { WEEKDAY_LABELS } from "../types";
@@ -44,7 +45,10 @@ export async function getOnboardingDraft(): Promise<OnboardingDraft | null> {
   return doctor ? mapDoctorToDraft(doctor) : null;
 }
 
-export async function saveOnboardingDraft(draft: OnboardingDraft): Promise<OnboardingDraft> {
+export async function saveOnboardingDraft(
+  draft: OnboardingDraft,
+  password?: string,
+): Promise<OnboardingDraft> {
   const existing = await db.doctor.findFirst({ orderBy: { createdAt: "asc" } });
 
   const doctorData = {
@@ -53,6 +57,9 @@ export async function saveOnboardingDraft(draft: OnboardingDraft): Promise<Onboa
     name: draft.doctorProfile.doctorName,
     specialty: draft.doctorProfile.specialty || null,
     whatsappPhone: draft.doctorProfile.whatsappNumber || null,
+    // Only set/overwrite when a new password was actually submitted — leaving it blank on an
+    // edit keeps the existing one.
+    ...(password ? { passwordHash: hashPassword(password) } : {}),
   };
 
   const doctor = existing

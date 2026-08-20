@@ -3,7 +3,7 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
   createSessionToken,
-  verifyPassword,
+  verifyLoginPassword,
 } from "@/lib/session";
 
 export async function POST(request: Request) {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   let isValid: boolean;
   try {
-    isValid = verifyPassword(password);
+    isValid = await verifyLoginPassword(password);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Login is not configured.";
     return NextResponse.json({ error: message }, { status: 500 });

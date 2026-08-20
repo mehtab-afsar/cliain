@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ClipboardCheck, Clock, UserRound } from "lucide-react";
+import { Building2, ClipboardCheck, Clock, Lock, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useOnboardingFlow } from "./hooks/use-onboarding-flow";
 import { OnboardingLayout } from "./components/onboarding-layout";
@@ -9,6 +9,7 @@ import { ClinicBasicsStep } from "./components/clinic-basics-step";
 import { DoctorProfileStep } from "./components/doctor-profile-step";
 import { WorkingHoursStep } from "./components/working-hours-step";
 import { ReviewStep } from "./components/review-step";
+import { SecurityStep } from "./components/security-step";
 
 const STEP_META = [
   {
@@ -35,6 +36,12 @@ const STEP_META = [
     title: "Review and finish",
     description: "Double-check everything before you go live.",
   },
+  {
+    label: "Secure",
+    icon: Lock,
+    title: "Protect your dashboard",
+    description: "Set a password — you'll use it to sign back in.",
+  },
 ];
 
 export function OnboardingView() {
@@ -46,9 +53,13 @@ export function OnboardingView() {
     error,
     isHydrated,
     isSubmitting,
+    isExistingClinic,
+    password,
+    confirmPassword,
     updateClinicBasics,
     updateDoctorProfile,
     updateWorkingHoursDay,
+    updateSecurity,
     goNext,
     goBack,
     finish,
@@ -96,6 +107,14 @@ export function OnboardingView() {
         />
       ) : null}
       {stepIndex === 3 ? <ReviewStep draft={draft} /> : null}
+      {stepIndex === 4 ? (
+        <SecurityStep
+          password={password}
+          confirmPassword={confirmPassword}
+          isExistingClinic={isExistingClinic}
+          onChange={updateSecurity}
+        />
+      ) : null}
     </OnboardingLayout>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,20 +49,11 @@ export function LoginView({ isConfigured }: LoginViewProps) {
         </div>
 
         {!isConfigured ? (
-          <div className="mt-8 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-            Dashboard login isn&apos;t set up yet. Set{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
-              DASHBOARD_PASSWORD
-            </code>{" "}
-            and{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
-              SESSION_SECRET
-            </code>{" "}
-            in{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
-              .env.local
-            </code>
-            , then restart the server.
+          <div className="mt-8 flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-5 text-center text-sm text-muted-foreground">
+            <p>You haven&apos;t set a dashboard password yet — that happens as the last step of setup.</p>
+            <Button className="w-full" render={<Link href="/onboarding" />} nativeButton={false}>
+              Go to setup
+            </Button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">

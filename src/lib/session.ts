@@ -1,14 +1,31 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { db } from "./db";
 import { env } from "./env";
+import { verifyPasswordHash } from "./password";
 
 export const SESSION_COOKIE_NAME = "cliain_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const SESSION_MAX_AGE_SECONDS = SESSION_TTL_MS / 1000;
 
-/** Both must be set for login to work at all — checked upfront by the login page/route. */
-export function isLoginConfigured(): boolean {
-  return Boolean(env.DASHBOARD_PASSWORD && env.SESSION_SECRET);
+// In dev, sign cookies with a random secret generated once per server process rather than
+// forcing SESSION_SECRET into .env.local before you can even finish onboarding — sessions just
+// don't survive a dev server restart. Production always requires the real env var (fail closed).
+const DEV_SESSION_SECRET =
+  process.env.NODE_ENV === "production" ? null : randomBytes(32).toString("base64");
+
+function getSessionSecret(): string | null {
+  return env.SESSION_SECRET ?? DEV_SESSION_SECRET;
+}
+
+async function getDoctorRow() {
+  return db.doctor.findFirst({ orderBy: { createdAt: "asc" } });
+}
+
+/** A password must be set (via onboarding, or DASHBOARD_PASSWORD) for login to be usable. */
+export async function isLoginConfigured(): Promise<boolean> {
+  const doctor = await getDoctorRow();
+  return Boolean(doctor?.passwordHash || env.DASHBOARD_PASSWORD);
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
@@ -18,22 +35,26 @@ function constantTimeEqual(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-export function verifyPassword(input: string): boolean {
-  if (!env.DASHBOARD_PASSWORD) {
-    throw new Error(
-      "DASHBOARD_PASSWORD is not set — required for dashboard login. Set it in .env.local.",
-    );
+/** DB-stored password (set during onboarding) wins; DASHBOARD_PASSWORD env var is the fallback. */
+export async function verifyLoginPassword(input: string): Promise<boolean> {
+  const doctor = await getDoctorRow();
+  if (doctor?.passwordHash) {
+    return verifyPasswordHash(input, doctor.passwordHash);
   }
-  return constantTimeEqual(input, env.DASHBOARD_PASSWORD);
+  if (env.DASHBOARD_PASSWORD) {
+    return constantTimeEqual(input, env.DASHBOARD_PASSWORD);
+  }
+  throw new Error("Dashboard login isn't set up yet — finish onboarding to set a password.");
 }
 
 function sign(payload: string): string {
-  if (!env.SESSION_SECRET) {
+  const secret = getSessionSecret();
+  if (!secret) {
     throw new Error(
-      "SESSION_SECRET is not set — required for dashboard login. Generate one with `openssl rand -base64 32` and add it to .env.local.",
+      "SESSION_SECRET is not set — required for dashboard login in production. Generate one with `openssl rand -base64 32`.",
     );
   }
-  return createHmac("sha256", env.SESSION_SECRET).update(payload).digest("base64url");
+  return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
 /** A stateless, HMAC-signed cookie value: `v1.<expiresAtMs>.<signature>`. No DB round trip to verify. */
@@ -44,7 +65,7 @@ export function createSessionToken(): string {
 
 /** Never throws — returns false for a missing/malformed/expired/unconfigured session. */
 export function isValidSessionToken(token: string | undefined): boolean {
-  if (!token || !env.SESSION_SECRET) return false;
+  if (!token || !getSessionSecret()) return false;
 
   const parts = token.split(".");
   if (parts.length !== 3) return false;
