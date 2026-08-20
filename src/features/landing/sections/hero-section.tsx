@@ -11,17 +11,8 @@ const DETAILS = [
 
 export function HeroSection() {
   return (
-    <section className="relative mx-auto flex w-full max-w-6xl flex-1 items-center overflow-hidden px-6 py-16">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 top-1/2 h-[32rem] w-[32rem] -translate-y-1/2 rounded-full bg-primary/10 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-32 bottom-0 h-80 w-80 rounded-full bg-accent/70 blur-3xl"
-      />
-
-      <div className="relative grid w-full items-center gap-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
+    <section className="mx-auto flex w-full max-w-6xl flex-1 items-center px-6 py-16">
+      <div className="grid w-full items-center gap-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 font-mono text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
