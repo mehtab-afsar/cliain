@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { db } from "./db";
 import { env } from "./env";
 import { verifyPasswordHash } from "./password";
@@ -8,11 +8,14 @@ export const SESSION_COOKIE_NAME = "cliain_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const SESSION_MAX_AGE_SECONDS = SESSION_TTL_MS / 1000;
 
-// In dev, sign cookies with a random secret generated once per server process rather than
-// forcing SESSION_SECRET into .env.local before you can even finish onboarding — sessions just
-// don't survive a dev server restart. Production always requires the real env var (fail closed).
+// In dev, sign cookies with a fixed, well-known secret instead of forcing SESSION_SECRET into
+// .env.local before you can even finish onboarding. Must be a FIXED string, not randomly
+// generated per module load — Next.js's dev server bundles proxy.ts separately from route
+// handlers, so each gets its own instance of this module; a random value would differ between
+// them and every session token would fail to verify. Production always requires the real env
+// var (fail closed) — this constant is never reachable there.
 const DEV_SESSION_SECRET =
-  process.env.NODE_ENV === "production" ? null : randomBytes(32).toString("base64");
+  process.env.NODE_ENV === "production" ? null : "cliain-insecure-dev-only-session-secret";
 
 function getSessionSecret(): string | null {
   return env.SESSION_SECRET ?? DEV_SESSION_SECRET;
