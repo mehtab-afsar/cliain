@@ -35,8 +35,6 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
       include: { patient: true, doctor: true },
     });
 
-    const vapiConfigured = window.voiceCall ? Boolean(await getVapiConfig()) : false;
-
     for (const appointment of dueAppointments) {
       const local = DateTime.fromJSDate(appointment.startAt, {
         zone: appointment.doctor.timezone,
@@ -46,7 +44,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
       let anySucceeded = false;
 
       try {
-        await sendWhatsappTemplate(appointment.patient.phone, window.template, "en_US", [
+        await sendWhatsappTemplate(appointment.doctorId, appointment.patient.phone, window.template, "en_US", [
           appointment.patient.name ?? "there",
           appointment.doctor.name,
           dateLabel,
@@ -60,6 +58,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
         );
       }
 
+      const vapiConfigured = window.voiceCall ? Boolean(await getVapiConfig(appointment.doctorId)) : false;
       if (vapiConfigured) {
         const call = await placeOutboundCall({
           doctor: appointment.doctor,

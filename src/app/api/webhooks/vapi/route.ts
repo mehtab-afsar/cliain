@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findTool } from "@/features/ai-agent/services/tools";
+import { getPrimaryDoctor } from "@/features/appointments/services/doctor-repository";
 
 type VapiToolCall = { id: string; name: string; arguments: Record<string, unknown> };
 
@@ -41,11 +42,12 @@ export async function POST(request: Request) {
     });
   }
 
+  const doctor = await getPrimaryDoctor();
   const results = await Promise.all(
     toolCalls.map(async (call) => {
       const tool = findTool(call.name);
       const result = tool
-        ? await tool.execute(call.arguments, { patientPhone })
+        ? await tool.execute(call.arguments, { patientPhone, doctorId: doctor.id })
         : { error: `Unknown tool: ${call.name}` };
       return { toolCallId: call.id, result: JSON.stringify(result) };
     }),

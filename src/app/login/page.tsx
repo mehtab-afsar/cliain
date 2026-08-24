@@ -1,7 +1,10 @@
 import { LoginView } from "@/features/login";
-import { isLoginConfigured } from "@/lib/session";
 
-export default async function LoginPage() {
-  const isConfigured = await isLoginConfigured();
-  return <LoginView isConfigured={isConfigured} />;
+type LoginPageProps = {
+  searchParams: Promise<{ next?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { next } = await searchParams;
+  return <LoginView next={next} />;
 }

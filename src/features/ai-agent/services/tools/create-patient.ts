@@ -16,7 +16,7 @@ export const createPatientTool: ToolDefinition<CreatePatientInput> = {
     required: ["name"],
   },
   async execute(input, context) {
-    const patient = await createPatient({ phone: context.patientPhone, name: input.name });
+    const patient = await createPatient(context.doctorId, { phone: context.patientPhone, name: input.name });
     return { patient: { id: patient.id, name: patient.name, phone: patient.phone } };
   },
 };

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { SESSION_COOKIE_NAME, isValidSessionToken } from "@/lib/session";
+import { auth } from "@/lib/auth";
 
-// Gates the dashboard and its sensitive data APIs behind a single shared password
-// (see /login). The public onboarding wizard (`/onboarding`, `/api/onboarding`) and the
-// patient-facing endpoints (WhatsApp/Vapi webhooks, `/api/ai/chat`) are intentionally
-// left open — they have no session to check and are protected by their own mechanisms
-// (Meta/Vapi's own request shape, the webhook verify token).
-export function proxy(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  if (isValidSessionToken(token)) {
+// Gates the dashboard and its sensitive data APIs behind a signed-in Google session
+// (see /login). Only checks "is there a session" here — a signed-in user with no
+// clinic membership yet is a separate case (handled by dashboard/layout.tsx, since
+// that needs a DB round trip this proxy shouldn't duplicate on every request). The
+// public onboarding wizard (`/onboarding`, `/api/onboarding`), `/invite/[token]`, and
+// the patient-facing endpoints (WhatsApp/Vapi webhooks, `/api/ai/chat`) are
+// intentionally left open — they gate themselves or are protected by their own
+// mechanisms (Meta/Vapi's own request shape, the webhook verify token).
+export default auth((request) => {
+  if (request.auth?.user) {
     return NextResponse.next();
   }
 
@@ -20,7 +21,7 @@ export function proxy(request: NextRequest) {
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("next", request.nextUrl.pathname);
   return NextResponse.redirect(loginUrl);
-}
+});
 
 export const config = {
   matcher: [

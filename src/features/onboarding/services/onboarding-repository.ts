@@ -1,6 +1,5 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/password";
 import type { Doctor, WorkingHours } from "@prisma/client";
 import type { OnboardingDraft } from "../types";
 import { WEEKDAY_LABELS } from "../types";
@@ -30,48 +29,17 @@ function mapDoctorToDraft(doctor: DoctorWithHours): OnboardingDraft {
         endTime: existing?.endTime ?? "17:00",
       };
     }),
-    // A Doctor row only ever exists after a first successful submit.
     completedAt: doctor.updatedAt.toISOString(),
   };
 }
 
-// Single-clinic, single-doctor MVP: no auth/tenancy yet, so we operate on the
-// one Doctor row that exists rather than scoping by a signed-in user.
-export async function getOnboardingDraft(): Promise<OnboardingDraft | null> {
-  const doctor = await db.doctor.findFirst({
-    include: { workingHours: true },
-    orderBy: { createdAt: "asc" },
-  });
-  return doctor ? mapDoctorToDraft(doctor) : null;
-}
-
-export async function saveOnboardingDraft(
-  draft: OnboardingDraft,
-  password?: string,
-): Promise<OnboardingDraft> {
-  const existing = await db.doctor.findFirst({ orderBy: { createdAt: "asc" } });
-
-  const doctorData = {
-    clinicName: draft.clinicBasics.clinicName,
-    timezone: draft.clinicBasics.timezone,
-    name: draft.doctorProfile.doctorName,
-    specialty: draft.doctorProfile.specialty || null,
-    whatsappPhone: draft.doctorProfile.whatsappNumber || null,
-    // Only set/overwrite when a new password was actually submitted — leaving it blank on an
-    // edit keeps the existing one.
-    ...(password ? { passwordHash: hashPassword(password) } : {}),
-  };
-
-  const doctor = existing
-    ? await db.doctor.update({ where: { id: existing.id }, data: doctorData })
-    : await db.doctor.create({ data: doctorData });
-
+async function upsertWorkingHours(doctorId: string, draft: OnboardingDraft): Promise<void> {
   await Promise.all(
     draft.workingHours.map((day) =>
       db.workingHours.upsert({
-        where: { doctorId_dayOfWeek: { doctorId: doctor.id, dayOfWeek: day.dayOfWeek } },
+        where: { doctorId_dayOfWeek: { doctorId, dayOfWeek: day.dayOfWeek } },
         create: {
-          doctorId: doctor.id,
+          doctorId,
           dayOfWeek: day.dayOfWeek,
           isOpen: day.isOpen,
           startTime: day.startTime,
@@ -85,8 +53,51 @@ export async function saveOnboardingDraft(
       }),
     ),
   );
+}
 
-  const saved = await getOnboardingDraft();
-  if (!saved) throw new Error("Failed to reload onboarding draft after save.");
+/** Reads an existing clinic's draft — used by the dashboard settings edit flow. */
+export async function getOnboardingDraft(doctorId: string): Promise<OnboardingDraft | null> {
+  const doctor = await db.doctor.findUnique({
+    where: { id: doctorId },
+    include: { workingHours: true },
+  });
+  return doctor ? mapDoctorToDraft(doctor) : null;
+}
+
+function doctorDataFromDraft(draft: OnboardingDraft) {
+  return {
+    clinicName: draft.clinicBasics.clinicName,
+    timezone: draft.clinicBasics.timezone,
+    name: draft.doctorProfile.doctorName,
+    specialty: draft.doctorProfile.specialty || null,
+    whatsappPhone: draft.doctorProfile.whatsappNumber || null,
+  };
+}
+
+/** Always creates a brand-new clinic, owned by `userId` — the one-time "no membership yet" flow. */
+export async function createClinic(
+  userId: string,
+  draft: OnboardingDraft,
+): Promise<{ draft: OnboardingDraft; doctorId: string }> {
+  const doctor = await db.$transaction(async (tx) => {
+    const created = await tx.doctor.create({ data: doctorDataFromDraft(draft) });
+    await tx.membership.create({ data: { userId, doctorId: created.id, role: "owner" } });
+    return created;
+  });
+
+  await upsertWorkingHours(doctor.id, draft);
+
+  const saved = await getOnboardingDraft(doctor.id);
+  if (!saved) throw new Error("Failed to reload onboarding draft after creating the clinic.");
+  return { draft: saved, doctorId: doctor.id };
+}
+
+/** Updates an existing clinic — the dashboard settings edit flow. */
+export async function updateClinic(doctorId: string, draft: OnboardingDraft): Promise<OnboardingDraft> {
+  await db.doctor.update({ where: { id: doctorId }, data: doctorDataFromDraft(draft) });
+  await upsertWorkingHours(doctorId, draft);
+
+  const saved = await getOnboardingDraft(doctorId);
+  if (!saved) throw new Error("Failed to reload onboarding draft after updating the clinic.");
   return saved;
 }

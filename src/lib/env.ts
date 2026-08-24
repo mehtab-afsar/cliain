@@ -12,8 +12,9 @@ const envSchema = z.object({
   VAPI_PHONE_NUMBER_ID: z.string().optional(),
   VAPI_TOOL_WEBHOOK_URL: z.string().optional(),
   INTEGRATION_ENCRYPTION_KEY: z.string().optional(),
-  DASHBOARD_PASSWORD: z.string().optional(),
-  SESSION_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  AUTH_SECRET: z.string().optional(),
 });
 
 function undefinedIfEmpty(value: string | undefined): string | undefined {
@@ -32,6 +33,7 @@ export const env = envSchema.parse({
   VAPI_PHONE_NUMBER_ID: undefinedIfEmpty(process.env.VAPI_PHONE_NUMBER_ID),
   VAPI_TOOL_WEBHOOK_URL: undefinedIfEmpty(process.env.VAPI_TOOL_WEBHOOK_URL),
   INTEGRATION_ENCRYPTION_KEY: undefinedIfEmpty(process.env.INTEGRATION_ENCRYPTION_KEY),
-  DASHBOARD_PASSWORD: undefinedIfEmpty(process.env.DASHBOARD_PASSWORD),
-  SESSION_SECRET: undefinedIfEmpty(process.env.SESSION_SECRET),
+  GOOGLE_CLIENT_ID: undefinedIfEmpty(process.env.GOOGLE_CLIENT_ID),
+  GOOGLE_CLIENT_SECRET: undefinedIfEmpty(process.env.GOOGLE_CLIENT_SECRET),
+  AUTH_SECRET: undefinedIfEmpty(process.env.AUTH_SECRET),
 });

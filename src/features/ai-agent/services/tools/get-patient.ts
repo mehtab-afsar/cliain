@@ -9,7 +9,7 @@ export const getPatientTool: ToolDefinition<Record<string, never>> = {
     "Look up the current patient's record and their upcoming booked appointments, by their WhatsApp phone number.",
   input_schema: { type: "object", properties: {} },
   async execute(_input, context) {
-    const patient = await getPatientByPhone(context.patientPhone);
+    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
     if (!patient) return { patient: null, upcomingAppointments: [] };
 
     const upcoming = await listUpcomingAppointmentsForPatient(patient.id);

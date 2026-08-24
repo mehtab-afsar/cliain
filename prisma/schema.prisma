@@ -6,6 +6,49 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  image       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+}
+
+enum MembershipRole {
+  owner
+  staff
+}
+
+model Membership {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doctorId  String
+  doctor    Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  role      MembershipRole
+  createdAt DateTime       @default(now())
+
+  @@unique([userId, doctorId])
+  @@index([doctorId])
+}
+
+model Invitation {
+  id               String         @id @default(cuid())
+  doctorId         String
+  doctor           Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  token            String         @unique
+  role             MembershipRole @default(staff)
+  createdByUserId  String
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  createdAt        DateTime       @default(now())
+
+  @@index([doctorId])
+}
+
 model Doctor {
   id            String         @id @default(cuid())
   clinicName    String?
@@ -16,6 +59,9 @@ model Doctor {
   googleCalendarId String?
   workingHours  WorkingHours[]
   appointments  Appointment[]
+  patients      Patient[]
+  memberships   Membership[]
+  invitations   Invitation[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -29,10 +75,6 @@ model Doctor {
   vapiPhoneNumberId       String?
   vapiToolWebhookUrl      String?
   googleServiceAccountJson String? @db.Text
-
-  // Dashboard login — set during onboarding's last step, hashed (scrypt). Falls back to
-  // DASHBOARD_PASSWORD env var when unset (see src/lib/session.ts).
-  passwordHash String?
 }
 
 model WorkingHours {
@@ -49,11 +91,15 @@ model WorkingHours {
 
 model Patient {
   id            String         @id @default(cuid())
+  doctorId      String
+  doctor        Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   name          String?
-  phone         String         @unique
+  phone         String
   createdAt     DateTime       @default(now())
   appointments  Appointment[]
   conversations Conversation[]
+
+  @@unique([doctorId, phone])
 }
 
 enum AppointmentStatus {

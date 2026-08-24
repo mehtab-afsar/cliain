@@ -48,14 +48,11 @@ export function saveDraft(draft: OnboardingDraft): void {
 }
 
 /** Persists the finished draft to the backend — this is the real Doctor/WorkingHours record. */
-export async function submitOnboarding(
-  draft: OnboardingDraft,
-  password?: string,
-): Promise<OnboardingDraft> {
+export async function submitOnboarding(draft: OnboardingDraft): Promise<OnboardingDraft> {
   const response = await fetch("/api/onboarding", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(password ? { ...draft, password } : draft),
+    body: JSON.stringify(draft),
   });
   if (!response.ok) {
     throw new Error("Failed to save onboarding details. Please try again.");

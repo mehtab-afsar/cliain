@@ -30,8 +30,8 @@ export const checkAvailabilityTool: ToolDefinition<CheckAvailabilityInput> = {
     },
     required: ["date"],
   },
-  async execute(input) {
-    const slots = await checkAvailability(input);
+  async execute(input, context) {
+    const slots = await checkAvailability(context.doctorId, input);
     return { slots };
   },
 };

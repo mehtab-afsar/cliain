@@ -23,12 +23,12 @@ export const bookAppointmentTool: ToolDefinition<BookAppointmentInput> = {
     required: ["startAt", "endAt"],
   },
   async execute(input, context) {
-    const patient = await getPatientByPhone(context.patientPhone);
+    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
     if (!patient) {
       return { error: "No patient record yet — call create_patient first, then retry." };
     }
     try {
-      const appointment = await bookAppointment({
+      const appointment = await bookAppointment(context.doctorId, {
         patientId: patient.id,
         startAt: input.startAt,
         endAt: input.endAt,

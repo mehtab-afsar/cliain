@@ -2,6 +2,7 @@ import "server-only";
 import { runAgentTurn } from "./agent-loop";
 import { sendWhatsappText } from "./whatsapp-client";
 import { hasProcessedWamid } from "./conversation-store";
+import { getPrimaryDoctor } from "@/features/appointments/services/doctor-repository";
 
 type InboundMessage = { from: string; wamid: string; text: string };
 
@@ -34,5 +35,6 @@ export async function handleInboundMessage(message: InboundMessage): Promise<voi
   if (await hasProcessedWamid(message.wamid)) return;
 
   const reply = await runAgentTurn(message.from, message.text, message.wamid);
-  await sendWhatsappText(message.from, reply);
+  const doctor = await getPrimaryDoctor();
+  await sendWhatsappText(doctor.id, message.from, reply);
 }

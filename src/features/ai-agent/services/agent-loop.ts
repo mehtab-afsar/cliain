@@ -33,9 +33,9 @@ export async function runAgentTurn(
 ): Promise<string> {
   const doctor = await getPrimaryDoctor();
 
-  let patient = await getPatientByPhone(patientPhone);
+  let patient = await getPatientByPhone(doctor.id, patientPhone);
   if (!patient) {
-    patient = await createPatient({ phone: patientPhone });
+    patient = await createPatient(doctor.id, { phone: patientPhone });
   }
 
   const history = await loadConversationHistory(patient.id);
@@ -83,7 +83,7 @@ export async function runAgentTurn(
     for (const toolUse of toolUseBlocks) {
       const tool = findTool(toolUse.name);
       const result = tool
-        ? await tool.execute(toolUse.input, { patientPhone })
+        ? await tool.execute(toolUse.input, { patientPhone, doctorId: doctor.id })
         : { error: `Unknown tool: ${toolUse.name}` };
       toolResults.push({
         type: "tool_result",

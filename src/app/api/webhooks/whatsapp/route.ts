@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { getWhatsappVerifyToken } from "@/lib/integration-credentials";
+import { getPrimaryDoctor } from "@/features/appointments/services/doctor-repository";
 import {
   handleInboundMessage,
   parseInboundMessage,
@@ -11,7 +12,8 @@ export async function GET(request: Request) {
   const mode = url.searchParams.get("hub.mode");
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
-  const verifyToken = await getWhatsappVerifyToken();
+  const doctor = await getPrimaryDoctor();
+  const verifyToken = await getWhatsappVerifyToken(doctor.id);
 
   if (mode === "subscribe" && token && verifyToken && token === verifyToken) {
     return new NextResponse(challenge ?? "", { status: 200 });

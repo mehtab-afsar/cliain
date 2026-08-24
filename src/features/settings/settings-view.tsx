@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ReviewStep } from "@/features/onboarding/components/review-step";
 import { useClinicDraft } from "./hooks/use-clinic-draft";
 import { IntegrationsSection } from "./components/integrations-section";
+import { TeamSection } from "./components/team-section";
 
 export function SettingsView() {
   const draft = useClinicDraft();
@@ -34,6 +35,8 @@ export function SettingsView() {
       </div>
 
       <IntegrationsSection />
+
+      <TeamSection />
     </div>
   );
 }

@@ -18,7 +18,7 @@ export const cancelAppointmentTool: ToolDefinition<CancelAppointmentInput> = {
     required: ["appointmentId"],
   },
   async execute(input, context) {
-    const patient = await getPatientByPhone(context.patientPhone);
+    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
     if (!patient) return { error: "No patient record found for this number." };
 
     const appointment = await db.appointment.findUnique({ where: { id: input.appointmentId } });
@@ -26,7 +26,7 @@ export const cancelAppointmentTool: ToolDefinition<CancelAppointmentInput> = {
       return { error: "That appointment doesn't belong to this patient." };
     }
 
-    const cancelled = await cancelAppointment(input.appointmentId);
+    const cancelled = await cancelAppointment(context.doctorId, input.appointmentId);
     return { appointment: { id: cancelled.id, status: cancelled.status } };
   },
 };

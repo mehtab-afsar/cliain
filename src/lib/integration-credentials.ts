@@ -5,17 +5,15 @@ import { db } from "./db";
 import { env } from "./env";
 import { decryptSecret, encryptSecret } from "./crypto";
 
-// Single-clinic MVP: no auth/tenancy yet, so — like the rest of the app — this operates on
-// the one Doctor row that exists. See doctor-repository.ts for the same pattern.
-async function getDoctorRow(): Promise<Doctor | null> {
-  return db.doctor.findFirst({ orderBy: { createdAt: "asc" } });
+async function getDoctorRow(doctorId: string): Promise<Doctor | null> {
+  return db.doctor.findUnique({ where: { id: doctorId } });
 }
 
 export type WhatsappConfig = { phoneNumberId: string; accessToken: string };
 
 /** DB-stored credentials win when present; falls back to env vars (self-hosted/.env.local flow). */
-export async function getWhatsappConfig(): Promise<WhatsappConfig | null> {
-  const doctor = await getDoctorRow();
+export async function getWhatsappConfig(doctorId: string): Promise<WhatsappConfig | null> {
+  const doctor = await getDoctorRow(doctorId);
   const phoneNumberId = doctor?.whatsappPhoneNumberId || env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = doctor?.whatsappAccessToken
     ? decryptSecret(doctor.whatsappAccessToken)
@@ -24,16 +22,16 @@ export async function getWhatsappConfig(): Promise<WhatsappConfig | null> {
   return { phoneNumberId, accessToken };
 }
 
-export async function getWhatsappVerifyToken(): Promise<string | null> {
-  const doctor = await getDoctorRow();
+export async function getWhatsappVerifyToken(doctorId: string): Promise<string | null> {
+  const doctor = await getDoctorRow(doctorId);
   if (doctor?.whatsappVerifyToken) return decryptSecret(doctor.whatsappVerifyToken);
   return env.WHATSAPP_VERIFY_TOKEN ?? null;
 }
 
 export type VapiConfig = { apiKey: string; phoneNumberId: string; webhookUrl: string };
 
-export async function getVapiConfig(): Promise<VapiConfig | null> {
-  const doctor = await getDoctorRow();
+export async function getVapiConfig(doctorId: string): Promise<VapiConfig | null> {
+  const doctor = await getDoctorRow(doctorId);
   const apiKey = doctor?.vapiApiKey ? decryptSecret(doctor.vapiApiKey) : env.VAPI_API_KEY;
   const phoneNumberId = doctor?.vapiPhoneNumberId || env.VAPI_PHONE_NUMBER_ID;
   const webhookUrl = doctor?.vapiToolWebhookUrl || env.VAPI_TOOL_WEBHOOK_URL;
@@ -43,8 +41,10 @@ export async function getVapiConfig(): Promise<VapiConfig | null> {
 
 export type GoogleServiceAccountCredentials = { client_email: string; private_key: string };
 
-export async function getGoogleServiceAccountCredentials(): Promise<GoogleServiceAccountCredentials | null> {
-  const doctor = await getDoctorRow();
+export async function getGoogleServiceAccountCredentials(
+  doctorId: string,
+): Promise<GoogleServiceAccountCredentials | null> {
+  const doctor = await getDoctorRow(doctorId);
   if (doctor?.googleServiceAccountJson) {
     return JSON.parse(decryptSecret(doctor.googleServiceAccountJson));
   }
@@ -55,8 +55,8 @@ export async function getGoogleServiceAccountCredentials(): Promise<GoogleServic
   return null;
 }
 
-export async function getGoogleCalendarId(): Promise<string | null> {
-  const doctor = await getDoctorRow();
+export async function getGoogleCalendarId(doctorId: string): Promise<string | null> {
+  const doctor = await getDoctorRow(doctorId);
   return doctor?.googleCalendarId ?? null;
 }
 
@@ -68,8 +68,8 @@ export type IntegrationsStatus = {
   googleCalendar: { connected: boolean; calendarId: string | null };
 };
 
-export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {
-  const doctor = await getDoctorRow();
+export async function getIntegrationsStatus(doctorId: string): Promise<IntegrationsStatus> {
+  const doctor = await getDoctorRow(doctorId);
   return {
     whatsapp: {
       connected: Boolean(doctor?.whatsappPhoneNumberId && doctor?.whatsappAccessToken),
@@ -87,14 +87,6 @@ export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {
   };
 }
 
-async function requireDoctorId(): Promise<string> {
-  const doctor = await getDoctorRow();
-  if (!doctor) {
-    throw new Error("Complete onboarding before connecting integrations.");
-  }
-  return doctor.id;
-}
-
 export type SaveIntegrationInput =
   | { provider: "whatsapp"; phoneNumberId?: string; accessToken?: string; verifyToken?: string }
   | { provider: "vapi"; apiKey?: string; phoneNumberId?: string; webhookUrl?: string }
@@ -102,10 +94,9 @@ export type SaveIntegrationInput =
 
 /** Only the fields present (non-empty) in `input` are updated — leaves the rest untouched. */
 export async function saveIntegrationCredentials(
+  doctorId: string,
   input: SaveIntegrationInput,
 ): Promise<IntegrationsStatus> {
-  const doctorId = await requireDoctorId();
-
   if (input.provider === "whatsapp") {
     await db.doctor.update({
       where: { id: doctorId },
@@ -136,14 +127,13 @@ export async function saveIntegrationCredentials(
     });
   }
 
-  return getIntegrationsStatus();
+  return getIntegrationsStatus(doctorId);
 }
 
 export async function disconnectIntegration(
+  doctorId: string,
   provider: "whatsapp" | "vapi" | "googleCalendar",
 ): Promise<IntegrationsStatus> {
-  const doctorId = await requireDoctorId();
-
   if (provider === "whatsapp") {
     await db.doctor.update({
       where: { id: doctorId },
@@ -161,5 +151,5 @@ export async function disconnectIntegration(
     });
   }
 
-  return getIntegrationsStatus();
+  return getIntegrationsStatus(doctorId);
 }

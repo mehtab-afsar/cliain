@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { Appointment } from "@prisma/client";
-import { getPrimaryDoctor } from "./doctor-repository";
+import { getDoctorById } from "./doctor-repository";
 import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "./calendar-sync";
 
 export type BookAppointmentInput = {
@@ -11,8 +11,8 @@ export type BookAppointmentInput = {
   reason?: string;
 };
 
-export async function bookAppointment(input: BookAppointmentInput): Promise<Appointment> {
-  const doctor = await getPrimaryDoctor();
+export async function bookAppointment(doctorId: string, input: BookAppointmentInput): Promise<Appointment> {
+  const doctor = await getDoctorById(doctorId);
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 
@@ -28,7 +28,7 @@ export async function bookAppointment(input: BookAppointmentInput): Promise<Appo
     throw new Error("That slot was just booked by someone else — please choose another time.");
   }
 
-  const patient = await db.patient.findUniqueOrThrow({ where: { id: input.patientId } });
+  const patient = await db.patient.findFirstOrThrow({ where: { id: input.patientId, doctorId: doctor.id } });
 
   const appointment = await db.appointment.create({
     data: {
@@ -43,6 +43,7 @@ export async function bookAppointment(input: BookAppointmentInput): Promise<Appo
 
   if (doctor.googleCalendarId) {
     const sync = await createCalendarEvent({
+      doctorId: doctor.id,
       calendarId: doctor.googleCalendarId,
       summary: `${patient.name ?? "Patient"} — ${doctor.name}`,
       description: input.reason,
@@ -61,9 +62,11 @@ export async function bookAppointment(input: BookAppointmentInput): Promise<Appo
   return appointment;
 }
 
-export async function cancelAppointment(appointmentId: string): Promise<Appointment> {
-  const doctor = await getPrimaryDoctor();
-  const existing = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId } });
+export async function cancelAppointment(doctorId: string, appointmentId: string): Promise<Appointment> {
+  const doctor = await getDoctorById(doctorId);
+  const existing = await db.appointment.findFirstOrThrow({
+    where: { id: appointmentId, doctorId: doctor.id },
+  });
 
   const appointment = await db.appointment.update({
     where: { id: appointmentId },
@@ -71,7 +74,7 @@ export async function cancelAppointment(appointmentId: string): Promise<Appointm
   });
 
   if (doctor.googleCalendarId && existing.googleCalendarEventId) {
-    await deleteCalendarEvent(doctor.googleCalendarId, existing.googleCalendarEventId);
+    await deleteCalendarEvent(doctor.id, doctor.googleCalendarId, existing.googleCalendarEventId);
   }
 
   return appointment;
@@ -84,10 +87,13 @@ export type RescheduleAppointmentInput = {
 };
 
 export async function rescheduleAppointment(
+  doctorId: string,
   input: RescheduleAppointmentInput,
 ): Promise<Appointment> {
-  const doctor = await getPrimaryDoctor();
-  const existing = await db.appointment.findUniqueOrThrow({ where: { id: input.appointmentId } });
+  const doctor = await getDoctorById(doctorId);
+  const existing = await db.appointment.findFirstOrThrow({
+    where: { id: input.appointmentId, doctorId: doctor.id },
+  });
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 
@@ -110,7 +116,7 @@ export async function rescheduleAppointment(
   });
 
   if (doctor.googleCalendarId && existing.googleCalendarEventId) {
-    await updateCalendarEvent(doctor.googleCalendarId, existing.googleCalendarEventId, {
+    await updateCalendarEvent(doctor.id, doctor.googleCalendarId, existing.googleCalendarEventId, {
       startAt,
       endAt,
       timezone: doctor.timezone,
@@ -127,8 +133,9 @@ export async function listUpcomingAppointmentsForPatient(patientId: string) {
   });
 }
 
-export async function listAppointments() {
+export async function listAppointments(doctorId: string) {
   return db.appointment.findMany({
+    where: { doctorId },
     include: { patient: true },
     orderBy: { startAt: "asc" },
   });

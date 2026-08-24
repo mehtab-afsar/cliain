@@ -24,7 +24,7 @@ export const rescheduleAppointmentTool: ToolDefinition<RescheduleAppointmentInpu
     required: ["appointmentId", "startAt", "endAt"],
   },
   async execute(input, context) {
-    const patient = await getPatientByPhone(context.patientPhone);
+    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
     if (!patient) return { error: "No patient record found for this number." };
 
     const appointment = await db.appointment.findUnique({ where: { id: input.appointmentId } });
@@ -33,7 +33,7 @@ export const rescheduleAppointmentTool: ToolDefinition<RescheduleAppointmentInpu
     }
 
     try {
-      const updated = await rescheduleAppointment({
+      const updated = await rescheduleAppointment(context.doctorId, {
         appointmentId: input.appointmentId,
         startAt: input.startAt,
         endAt: input.endAt,

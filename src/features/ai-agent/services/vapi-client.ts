@@ -7,8 +7,8 @@ import { buildSystemPrompt } from "./system-prompt";
 
 const VAPI_API_BASE = "https://api.vapi.ai";
 
-async function requireVapiConfig() {
-  const config = await getVapiConfig();
+async function requireVapiConfig(doctorId: string) {
+  const config = await getVapiConfig(doctorId);
   if (!config) {
     throw new Error(
       "Vapi is not configured — connect it from Settings, or set VAPI_API_KEY, VAPI_PHONE_NUMBER_ID, and VAPI_TOOL_WEBHOOK_URL in .env.local.",
@@ -58,7 +58,7 @@ export type PlaceCallResult = { ok: true; callId: string } | { ok: false; error:
 /** Places an outbound call. Best-effort — never throws; callers decide how to handle failure. */
 export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCallResult> {
   try {
-    const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig();
+    const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig(input.doctor.id);
 
     const response = await fetch(`${VAPI_API_BASE}/call`, {
       method: "POST",

@@ -39,7 +39,6 @@ export const ONBOARDING_STEPS = [
   "doctor-profile",
   "working-hours",
   "review",
-  "security",
 ] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];

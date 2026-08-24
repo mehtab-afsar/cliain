@@ -2,8 +2,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { Patient } from "@prisma/client";
 
-export async function getPatientByPhone(phone: string): Promise<Patient | null> {
-  return db.patient.findUnique({ where: { phone } });
+export async function getPatientByPhone(doctorId: string, phone: string): Promise<Patient | null> {
+  return db.patient.findFirst({ where: { doctorId, phone } });
 }
 
 export type CreatePatientInput = {
@@ -11,14 +11,14 @@ export type CreatePatientInput = {
   name?: string;
 };
 
-export async function createPatient(input: CreatePatientInput): Promise<Patient> {
+export async function createPatient(doctorId: string, input: CreatePatientInput): Promise<Patient> {
   return db.patient.upsert({
-    where: { phone: input.phone },
-    create: { phone: input.phone, name: input.name },
+    where: { doctorId_phone: { doctorId, phone: input.phone } },
+    create: { doctorId, phone: input.phone, name: input.name },
     update: input.name ? { name: input.name } : {},
   });
 }
 
-export async function listPatients(): Promise<Patient[]> {
-  return db.patient.findMany({ orderBy: { createdAt: "desc" } });
+export async function listPatients(doctorId: string): Promise<Patient[]> {
+  return db.patient.findMany({ where: { doctorId }, orderBy: { createdAt: "desc" } });
 }

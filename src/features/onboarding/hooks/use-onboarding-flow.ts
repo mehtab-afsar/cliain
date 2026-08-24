@@ -8,22 +8,9 @@ import {
   saveDraft,
   submitOnboarding,
 } from "../services/onboarding-service";
-import {
-  ONBOARDING_STEPS,
-  type ClinicBasics,
-  type DoctorProfile,
-  type OnboardingDraft,
-  type WorkingHoursDay,
-} from "../types";
+import { ONBOARDING_STEPS, type ClinicBasics, type DoctorProfile, type OnboardingDraft, type WorkingHoursDay } from "../types";
 
-const SECURITY_STEP_INDEX = ONBOARDING_STEPS.indexOf("security");
-
-function validateStep(
-  stepIndex: number,
-  draft: OnboardingDraft,
-  security: { password: string; confirmPassword: string },
-  isExistingClinic: boolean,
-): string | null {
+function validateStep(stepIndex: number, draft: OnboardingDraft): string | null {
   if (stepIndex === 0) {
     if (!draft.clinicBasics.clinicName.trim()) return "Enter your clinic's name.";
     if (!draft.clinicBasics.timezone.trim()) return "Select a timezone.";
@@ -40,22 +27,12 @@ function validateStep(
     if (invalidDay) return `${invalidDay.label}'s closing time must be after opening time.`;
     return null;
   }
-  if (stepIndex === SECURITY_STEP_INDEX) {
-    if (!security.password && !security.confirmPassword) {
-      return isExistingClinic ? null : "Set a password to protect your dashboard.";
-    }
-    if (security.password.length < 8) return "Password must be at least 8 characters.";
-    if (security.password !== security.confirmPassword) return "Passwords don't match.";
-    return null;
-  }
   return null;
 }
 
 export function useOnboardingFlow() {
   const [draft, setDraft] = useState<OnboardingDraft>(createEmptyDraft);
   const [isExistingClinic, setIsExistingClinic] = useState(false);
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -104,21 +81,8 @@ export function useOnboardingFlow() {
     [],
   );
 
-  const updateSecurity = useCallback(
-    (patch: { password?: string; confirmPassword?: string }) => {
-      if (patch.password !== undefined) setPassword(patch.password);
-      if (patch.confirmPassword !== undefined) setConfirmPassword(patch.confirmPassword);
-    },
-    [],
-  );
-
   const goNext = useCallback(() => {
-    const validationError = validateStep(
-      stepIndex,
-      draft,
-      { password, confirmPassword },
-      isExistingClinic,
-    );
+    const validationError = validateStep(stepIndex, draft);
     if (validationError) {
       setError(validationError);
       return false;
@@ -126,7 +90,7 @@ export function useOnboardingFlow() {
     setError(null);
     setStepIndex((index) => Math.min(index + 1, ONBOARDING_STEPS.length - 1));
     return true;
-  }, [stepIndex, draft, password, confirmPassword, isExistingClinic]);
+  }, [stepIndex, draft]);
 
   const goBack = useCallback(() => {
     setError(null);
@@ -134,12 +98,7 @@ export function useOnboardingFlow() {
   }, []);
 
   const finish = useCallback(async () => {
-    const validationError = validateStep(
-      stepIndex,
-      draft,
-      { password, confirmPassword },
-      isExistingClinic,
-    );
+    const validationError = validateStep(stepIndex, draft);
     if (validationError) {
       setError(validationError);
       return null;
@@ -147,7 +106,7 @@ export function useOnboardingFlow() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const completed = await submitOnboarding(draft, password || undefined);
+      const completed = await submitOnboarding(draft);
       setDraft(completed);
       return completed;
     } catch {
@@ -156,7 +115,7 @@ export function useOnboardingFlow() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [draft, password, confirmPassword, stepIndex, isExistingClinic]);
+  }, [draft, stepIndex]);
 
   return {
     draft,
@@ -167,12 +126,9 @@ export function useOnboardingFlow() {
     isHydrated,
     isSubmitting,
     isExistingClinic,
-    password,
-    confirmPassword,
     updateClinicBasics,
     updateDoctorProfile,
     updateWorkingHoursDay,
-    updateSecurity,
     goNext,
     goBack,
     finish,

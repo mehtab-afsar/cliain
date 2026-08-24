@@ -1,6 +1,7 @@
 // Manual verification for the slot-computation logic, independent of Claude/WhatsApp.
 // Usage: npx tsx scripts/check-availability.ts 2026-08-19 [earliestTime] [latestTime]
 import { checkAvailability } from "../src/features/appointments/services/availability-service";
+import { getPrimaryDoctor } from "../src/features/appointments/services/doctor-repository";
 
 async function main() {
   const [date, earliestTime, latestTime] = process.argv.slice(2);
@@ -9,7 +10,8 @@ async function main() {
     process.exit(1);
   }
 
-  const slots = await checkAvailability({ date, earliestTime, latestTime });
+  const doctor = await getPrimaryDoctor();
+  const slots = await checkAvailability(doctor.id, { date, earliestTime, latestTime });
   if (slots.length === 0) {
     console.log(`No open slots on ${date}.`);
     return;
