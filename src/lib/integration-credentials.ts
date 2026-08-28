@@ -1,6 +1,5 @@
 import "server-only";
-import { readFileSync } from "node:fs";
-import type { Doctor } from "@prisma/client";
+import { Prisma, type Doctor } from "@prisma/client";
 import { db } from "./db";
 import { env } from "./env";
 import { decryptSecret, encryptSecret } from "./crypto";
@@ -11,32 +10,48 @@ async function getDoctorRow(doctorId: string): Promise<Doctor | null> {
 
 export type WhatsappConfig = { phoneNumberId: string; accessToken: string };
 
-/** DB-stored credentials win when present; falls back to env vars (self-hosted/.env.local flow). */
+/** Every clinic connects its own — no shared/env-var fallback (that would leak one clinic's credentials to every other). */
 export async function getWhatsappConfig(doctorId: string): Promise<WhatsappConfig | null> {
   const doctor = await getDoctorRow(doctorId);
-  const phoneNumberId = doctor?.whatsappPhoneNumberId || env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = doctor?.whatsappAccessToken
-    ? decryptSecret(doctor.whatsappAccessToken)
-    : env.WHATSAPP_ACCESS_TOKEN;
-  if (!phoneNumberId || !accessToken) return null;
-  return { phoneNumberId, accessToken };
+  if (!doctor?.whatsappPhoneNumberId || !doctor?.whatsappAccessToken) return null;
+  return {
+    phoneNumberId: doctor.whatsappPhoneNumberId,
+    accessToken: decryptSecret(doctor.whatsappAccessToken),
+  };
 }
 
 export async function getWhatsappVerifyToken(doctorId: string): Promise<string | null> {
   const doctor = await getDoctorRow(doctorId);
-  if (doctor?.whatsappVerifyToken) return decryptSecret(doctor.whatsappVerifyToken);
-  return env.WHATSAPP_VERIFY_TOKEN ?? null;
+  return doctor?.whatsappVerifyToken ? decryptSecret(doctor.whatsappVerifyToken) : null;
+}
+
+/** Verifies Meta's `X-Hub-Signature-256` header. Null (not yet configured) skips verification. */
+export async function getWhatsappAppSecret(doctorId: string): Promise<string | null> {
+  const doctor = await getDoctorRow(doctorId);
+  return doctor?.whatsappAppSecret ? decryptSecret(doctor.whatsappAppSecret) : null;
 }
 
 export type VapiConfig = { apiKey: string; phoneNumberId: string; webhookUrl: string };
 
+/**
+ * The webhook URL is computed, not stored — it's fully deterministic now that routing is
+ * per-clinic (APP_URL + this doctor's id), so there's no separate copy that could drift from
+ * the real thing. Requires APP_URL to be set (the deployment's public base URL).
+ */
 export async function getVapiConfig(doctorId: string): Promise<VapiConfig | null> {
   const doctor = await getDoctorRow(doctorId);
-  const apiKey = doctor?.vapiApiKey ? decryptSecret(doctor.vapiApiKey) : env.VAPI_API_KEY;
-  const phoneNumberId = doctor?.vapiPhoneNumberId || env.VAPI_PHONE_NUMBER_ID;
-  const webhookUrl = doctor?.vapiToolWebhookUrl || env.VAPI_TOOL_WEBHOOK_URL;
-  if (!apiKey || !phoneNumberId || !webhookUrl) return null;
-  return { apiKey, phoneNumberId, webhookUrl };
+  if (!doctor?.vapiApiKey || !doctor?.vapiPhoneNumberId || !env.APP_URL) return null;
+  return {
+    apiKey: decryptSecret(doctor.vapiApiKey),
+    phoneNumberId: doctor.vapiPhoneNumberId,
+    webhookUrl: `${env.APP_URL}/api/webhooks/vapi/${doctorId}`,
+  };
+}
+
+/** Sent back by Vapi as a header on every tool-call request. Null skips verification. */
+export async function getVapiWebhookSecret(doctorId: string): Promise<string | null> {
+  const doctor = await getDoctorRow(doctorId);
+  return doctor?.vapiWebhookSecret ? decryptSecret(doctor.vapiWebhookSecret) : null;
 }
 
 export type GoogleServiceAccountCredentials = { client_email: string; private_key: string };
@@ -45,14 +60,8 @@ export async function getGoogleServiceAccountCredentials(
   doctorId: string,
 ): Promise<GoogleServiceAccountCredentials | null> {
   const doctor = await getDoctorRow(doctorId);
-  if (doctor?.googleServiceAccountJson) {
-    return JSON.parse(decryptSecret(doctor.googleServiceAccountJson));
-  }
-  if (env.GOOGLE_SERVICE_ACCOUNT_JSON) return JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
-  if (env.GOOGLE_SERVICE_ACCOUNT_FILE) {
-    return JSON.parse(readFileSync(env.GOOGLE_SERVICE_ACCOUNT_FILE, "utf-8"));
-  }
-  return null;
+  if (!doctor?.googleServiceAccountJson) return null;
+  return JSON.parse(decryptSecret(doctor.googleServiceAccountJson));
 }
 
 export async function getGoogleCalendarId(doctorId: string): Promise<string | null> {
@@ -63,22 +72,25 @@ export async function getGoogleCalendarId(doctorId: string): Promise<string | nu
 // --- Status + save, for the Settings → Integrations UI -------------------------------------
 
 export type IntegrationsStatus = {
-  whatsapp: { connected: boolean; phoneNumberId: string | null };
-  vapi: { connected: boolean; phoneNumberId: string | null; webhookUrl: string | null };
+  doctorId: string;
+  whatsapp: { connected: boolean; phoneNumberId: string | null; hasAppSecret: boolean };
+  vapi: { connected: boolean; phoneNumberId: string | null; hasWebhookSecret: boolean };
   googleCalendar: { connected: boolean; calendarId: string | null };
 };
 
 export async function getIntegrationsStatus(doctorId: string): Promise<IntegrationsStatus> {
   const doctor = await getDoctorRow(doctorId);
   return {
+    doctorId,
     whatsapp: {
       connected: Boolean(doctor?.whatsappPhoneNumberId && doctor?.whatsappAccessToken),
       phoneNumberId: doctor?.whatsappPhoneNumberId ?? null,
+      hasAppSecret: Boolean(doctor?.whatsappAppSecret),
     },
     vapi: {
       connected: Boolean(doctor?.vapiApiKey && doctor?.vapiPhoneNumberId),
       phoneNumberId: doctor?.vapiPhoneNumberId ?? null,
-      webhookUrl: doctor?.vapiToolWebhookUrl ?? null,
+      hasWebhookSecret: Boolean(doctor?.vapiWebhookSecret),
     },
     googleCalendar: {
       connected: Boolean(doctor?.googleServiceAccountJson),
@@ -88,43 +100,69 @@ export async function getIntegrationsStatus(doctorId: string): Promise<Integrati
 }
 
 export type SaveIntegrationInput =
-  | { provider: "whatsapp"; phoneNumberId?: string; accessToken?: string; verifyToken?: string }
-  | { provider: "vapi"; apiKey?: string; phoneNumberId?: string; webhookUrl?: string }
+  | {
+      provider: "whatsapp";
+      phoneNumberId?: string;
+      accessToken?: string;
+      verifyToken?: string;
+      appSecret?: string;
+    }
+  | { provider: "vapi"; apiKey?: string; phoneNumberId?: string; webhookSecret?: string }
   | { provider: "googleCalendar"; serviceAccountJson?: string; calendarId?: string };
+
+function isUniqueConstraintError(error: unknown, field: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002" &&
+    Array.isArray(error.meta?.target) &&
+    (error.meta.target as string[]).includes(field)
+  );
+}
 
 /** Only the fields present (non-empty) in `input` are updated — leaves the rest untouched. */
 export async function saveIntegrationCredentials(
   doctorId: string,
   input: SaveIntegrationInput,
 ): Promise<IntegrationsStatus> {
-  if (input.provider === "whatsapp") {
-    await db.doctor.update({
-      where: { id: doctorId },
-      data: {
-        ...(input.phoneNumberId ? { whatsappPhoneNumberId: input.phoneNumberId } : {}),
-        ...(input.accessToken ? { whatsappAccessToken: encryptSecret(input.accessToken) } : {}),
-        ...(input.verifyToken ? { whatsappVerifyToken: encryptSecret(input.verifyToken) } : {}),
-      },
-    });
-  } else if (input.provider === "vapi") {
-    await db.doctor.update({
-      where: { id: doctorId },
-      data: {
-        ...(input.apiKey ? { vapiApiKey: encryptSecret(input.apiKey) } : {}),
-        ...(input.phoneNumberId ? { vapiPhoneNumberId: input.phoneNumberId } : {}),
-        ...(input.webhookUrl ? { vapiToolWebhookUrl: input.webhookUrl } : {}),
-      },
-    });
-  } else {
-    await db.doctor.update({
-      where: { id: doctorId },
-      data: {
-        ...(input.serviceAccountJson
-          ? { googleServiceAccountJson: encryptSecret(input.serviceAccountJson) }
-          : {}),
-        ...(input.calendarId ? { googleCalendarId: input.calendarId } : {}),
-      },
-    });
+  try {
+    if (input.provider === "whatsapp") {
+      await db.doctor.update({
+        where: { id: doctorId },
+        data: {
+          ...(input.phoneNumberId ? { whatsappPhoneNumberId: input.phoneNumberId } : {}),
+          ...(input.accessToken ? { whatsappAccessToken: encryptSecret(input.accessToken) } : {}),
+          ...(input.verifyToken ? { whatsappVerifyToken: encryptSecret(input.verifyToken) } : {}),
+          ...(input.appSecret ? { whatsappAppSecret: encryptSecret(input.appSecret) } : {}),
+        },
+      });
+    } else if (input.provider === "vapi") {
+      await db.doctor.update({
+        where: { id: doctorId },
+        data: {
+          ...(input.apiKey ? { vapiApiKey: encryptSecret(input.apiKey) } : {}),
+          ...(input.phoneNumberId ? { vapiPhoneNumberId: input.phoneNumberId } : {}),
+          ...(input.webhookSecret ? { vapiWebhookSecret: encryptSecret(input.webhookSecret) } : {}),
+        },
+      });
+    } else {
+      await db.doctor.update({
+        where: { id: doctorId },
+        data: {
+          ...(input.serviceAccountJson
+            ? { googleServiceAccountJson: encryptSecret(input.serviceAccountJson) }
+            : {}),
+          ...(input.calendarId ? { googleCalendarId: input.calendarId } : {}),
+        },
+      });
+    }
+  } catch (error) {
+    if (isUniqueConstraintError(error, "whatsappPhoneNumberId")) {
+      throw new Error("This WhatsApp phone number is already connected to another clinic.");
+    }
+    if (isUniqueConstraintError(error, "vapiPhoneNumberId")) {
+      throw new Error("This Vapi phone number is already connected to another clinic.");
+    }
+    throw error;
   }
 
   return getIntegrationsStatus(doctorId);
@@ -137,12 +175,21 @@ export async function disconnectIntegration(
   if (provider === "whatsapp") {
     await db.doctor.update({
       where: { id: doctorId },
-      data: { whatsappPhoneNumberId: null, whatsappAccessToken: null, whatsappVerifyToken: null },
+      data: {
+        whatsappPhoneNumberId: null,
+        whatsappAccessToken: null,
+        whatsappVerifyToken: null,
+        whatsappAppSecret: null,
+      },
     });
   } else if (provider === "vapi") {
     await db.doctor.update({
       where: { id: doctorId },
-      data: { vapiApiKey: null, vapiPhoneNumberId: null, vapiToolWebhookUrl: null },
+      data: {
+        vapiApiKey: null,
+        vapiPhoneNumberId: null,
+        vapiWebhookSecret: null,
+      },
     });
   } else {
     await db.doctor.update({

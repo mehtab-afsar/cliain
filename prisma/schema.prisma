@@ -66,14 +66,22 @@ model Doctor {
   updatedAt     DateTime       @updatedAt
 
   // Integration credentials — set from Settings → Integrations, encrypted at rest.
-  // Falls back to env vars (see src/lib/env.ts) when unset, so an existing .env.local
-  // deployment keeps working without visiting Settings.
-  whatsappPhoneNumberId   String?
+  // Every clinic connects its own; there is no shared/fallback credential anymore
+  // (a shared fallback would leak one clinic's WhatsApp/Vapi access to every other).
+  // whatsappPhoneNumberId/vapiPhoneNumberId are unique so two clinics can't silently
+  // collide on the same number — Postgres allows multiple NULLs, so unconfigured
+  // clinics never conflict with each other.
+  whatsappPhoneNumberId   String? @unique
   whatsappAccessToken     String?
   whatsappVerifyToken     String?
+  // Meta's per-App signing secret — verifies inbound webhook deliveries actually came
+  // from Meta (HMAC over the raw body, header `X-Hub-Signature-256`).
+  whatsappAppSecret       String?
   vapiApiKey              String?
-  vapiPhoneNumberId       String?
-  vapiToolWebhookUrl      String?
+  vapiPhoneNumberId       String? @unique
+  // Echoed back by Vapi as a header on every tool-call request — verifies it actually
+  // came from Vapi, not an outsider who found the webhook URL.
+  vapiWebhookSecret       String?
   googleServiceAccountJson String? @db.Text
 }
 

@@ -6,9 +6,7 @@ const GRAPH_API_VERSION = "v21.0";
 async function requireWhatsappConfig(doctorId: string) {
   const config = await getWhatsappConfig(doctorId);
   if (!config) {
-    throw new Error(
-      "WhatsApp is not configured — connect it from Settings, or set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN in .env.local.",
-    );
+    throw new Error("WhatsApp is not configured for this clinic — connect it from Settings.");
   }
   return config;
 }

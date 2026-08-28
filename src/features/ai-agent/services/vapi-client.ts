@@ -1,6 +1,6 @@
 import "server-only";
 import type { Doctor } from "@prisma/client";
-import { getVapiConfig } from "@/lib/integration-credentials";
+import { getVapiConfig, getVapiWebhookSecret } from "@/lib/integration-credentials";
 import { AGENT_MODEL } from "@/lib/anthropic";
 import { AGENT_TOOLS } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
@@ -10,9 +10,7 @@ const VAPI_API_BASE = "https://api.vapi.ai";
 async function requireVapiConfig(doctorId: string) {
   const config = await getVapiConfig(doctorId);
   if (!config) {
-    throw new Error(
-      "Vapi is not configured — connect it from Settings, or set VAPI_API_KEY, VAPI_PHONE_NUMBER_ID, and VAPI_TOOL_WEBHOOK_URL in .env.local.",
-    );
+    throw new Error("Vapi is not configured for this clinic — connect it from Settings.");
   }
   return config;
 }
@@ -25,6 +23,7 @@ function buildAssistantConfig(
   patientName: string | null,
   callPurpose: string,
   webhookUrl: string,
+  webhookSecret: string | null,
 ) {
   return {
     model: {
@@ -38,7 +37,7 @@ function buildAssistantConfig(
           description: tool.description,
           parameters: tool.input_schema,
         },
-        server: { url: webhookUrl },
+        server: webhookSecret ? { url: webhookUrl, secret: webhookSecret } : { url: webhookUrl },
       })),
     },
     firstMessage: `Hi${patientName ? ` ${patientName}` : ""}, this is ${doctor.clinicName ?? doctor.name} calling. ${callPurpose}`,
@@ -59,6 +58,7 @@ export type PlaceCallResult = { ok: true; callId: string } | { ok: false; error:
 export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCallResult> {
   try {
     const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig(input.doctor.id);
+    const webhookSecret = await getVapiWebhookSecret(input.doctor.id);
 
     const response = await fetch(`${VAPI_API_BASE}/call`, {
       method: "POST",
@@ -69,7 +69,13 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
       body: JSON.stringify({
         phoneNumberId,
         customer: { number: input.toPhone },
-        assistant: buildAssistantConfig(input.doctor, input.patientName, input.callPurpose, webhookUrl),
+        assistant: buildAssistantConfig(
+          input.doctor,
+          input.patientName,
+          input.callPurpose,
+          webhookUrl,
+          webhookSecret,
+        ),
       }),
     });
 

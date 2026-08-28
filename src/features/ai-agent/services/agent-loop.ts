@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, AGENT_MODEL } from "@/lib/anthropic";
 import { getPatientByPhone, createPatient } from "@/features/patients/services/patient-service";
-import { getPrimaryDoctor } from "@/features/appointments/services/doctor-repository";
+import { getDoctorById } from "@/features/appointments/services/doctor-repository";
 import { getToolSchemas, findTool } from "./tools";
 import { appendMessage, loadConversationHistory } from "./conversation-store";
 import { buildSystemPrompt } from "./system-prompt";
@@ -27,11 +27,12 @@ function toMessageParamContent(
 
 /** Runs one full turn — inbound message in, final reply text out. Persists both to the conversation. */
 export async function runAgentTurn(
+  doctorId: string,
   patientPhone: string,
   inboundMessage: string,
   wamid?: string,
 ): Promise<string> {
-  const doctor = await getPrimaryDoctor();
+  const doctor = await getDoctorById(doctorId);
 
   let patient = await getPatientByPhone(doctor.id, patientPhone);
   if (!patient) {

@@ -1,13 +1,7 @@
 export type ToolContext = {
   /** The WhatsApp sender's phone number — backend-controlled, never something Claude supplies. */
   patientPhone: string;
-  /**
-   * Which clinic this conversation belongs to — currently always the legacy
-   * singleton (see doctor-repository.ts's getPrimaryDoctor), since resolving the
-   * real tenant from a WhatsApp/Vapi webhook is a follow-up stage, not part of
-   * this multi-tenant migration. Threaded through so Patient/Appointment
-   * lookups compile against the now-tenant-scoped schema.
-   */
+  /** Which clinic this conversation belongs to — resolved from the doctorId path segment in the per-clinic webhook URL (see src/app/api/webhooks). */
   doctorId: string;
 };
 

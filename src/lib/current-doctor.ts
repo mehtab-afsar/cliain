@@ -10,7 +10,12 @@ export async function getCurrentDoctor(): Promise<CurrentDoctor | null> {
   const userId = session?.user?.id;
   if (!userId) return null;
 
-  const membership = await db.membership.findFirst({ where: { userId } });
+  // Deterministic, not "whichever Postgres happens to return first" — matters if the
+  // one-clinic-per-user policy in invitation-service.ts ever relaxes.
+  const membership = await db.membership.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
   if (!membership) return null;
 
   return { doctorId: membership.doctorId, role: membership.role, userId };

@@ -8,6 +8,8 @@ export function IntegrationsSection() {
 
   if (!status) return null;
 
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -23,6 +25,10 @@ export function IntegrationsSection() {
         connected={status.whatsapp.connected}
         isSaving={savingProvider === "whatsapp"}
         error={errorByProvider.whatsapp}
+        webhookUrl={{
+          label: "Webhook URL — paste into your Meta App's WhatsApp product",
+          value: `${origin}/api/webhooks/whatsapp/${status.doctorId}`,
+        }}
         fields={[
           {
             key: "phoneNumberId",
@@ -41,6 +47,12 @@ export function IntegrationsSection() {
             placeholder: "Any secret string you choose",
             secret: true,
           },
+          {
+            key: "appSecret",
+            label: "App secret",
+            placeholder: status.whatsapp.hasAppSecret ? undefined : "Recommended — verifies requests came from Meta",
+            secret: true,
+          },
         ]}
         onSave={(values) => save({ provider: "whatsapp", ...values })}
         onDisconnect={() => disconnect("whatsapp")}
@@ -52,6 +64,10 @@ export function IntegrationsSection() {
         connected={status.vapi.connected}
         isSaving={savingProvider === "vapi"}
         error={errorByProvider.vapi}
+        webhookUrl={{
+          label: "Tool webhook URL — set as your Vapi assistant's server URL",
+          value: `${origin}/api/webhooks/vapi/${status.doctorId}`,
+        }}
         fields={[
           {
             key: "apiKey",
@@ -64,10 +80,12 @@ export function IntegrationsSection() {
             initialValue: status.vapi.phoneNumberId,
           },
           {
-            key: "webhookUrl",
-            label: "Tool webhook URL",
-            placeholder: "https://your-domain.com/api/webhooks/vapi",
-            initialValue: status.vapi.webhookUrl,
+            key: "webhookSecret",
+            label: "Webhook secret",
+            placeholder: status.vapi.hasWebhookSecret
+              ? undefined
+              : "Recommended — set the same value as your assistant's server secret",
+            secret: true,
           },
         ]}
         onSave={(values) => save({ provider: "vapi", ...values })}

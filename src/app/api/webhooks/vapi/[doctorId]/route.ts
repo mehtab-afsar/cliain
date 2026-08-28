@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { findTool } from "@/features/ai-agent/services/tools";
-import { getPrimaryDoctor } from "@/features/appointments/services/doctor-repository";
+import { getDoctorById } from "@/features/appointments/services/doctor-repository";
+import { getVapiWebhookSecret } from "@/lib/integration-credentials";
+import { verifyVapiSecret } from "@/lib/webhook-signatures";
+
+type RouteParams = { params: Promise<{ doctorId: string }> };
 
 type VapiToolCall = { id: string; name: string; arguments: Record<string, unknown> };
 
@@ -23,7 +27,27 @@ function resolvePatientPhone(payload: VapiWebhookPayload): string | null {
   return message.call?.customer?.number ?? message.customer?.number ?? message.phoneNumber ?? null;
 }
 
-export async function POST(request: Request) {
+// Per-clinic URL — the doctorId in the path is the tenant key, set as this clinic's own
+// "Tool webhook URL" when configuring their Vapi assistant (see Settings → Integrations).
+export async function POST(request: Request, { params }: RouteParams) {
+  const { doctorId } = await params;
+
+  try {
+    await getDoctorById(doctorId);
+  } catch {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  // Skipped (not skippable) once a clinic has set a webhook secret — until then, connecting
+  // Vapi at all still works, just without this extra check.
+  const webhookSecret = await getVapiWebhookSecret(doctorId);
+  if (webhookSecret) {
+    const secretHeader = request.headers.get("x-vapi-secret");
+    if (!verifyVapiSecret(secretHeader, webhookSecret)) {
+      return new NextResponse("Invalid secret", { status: 401 });
+    }
+  }
+
   const payload = (await request.json()) as VapiWebhookPayload;
 
   if (payload.message?.type !== "tool-calls") {
@@ -42,12 +66,11 @@ export async function POST(request: Request) {
     });
   }
 
-  const doctor = await getPrimaryDoctor();
   const results = await Promise.all(
     toolCalls.map(async (call) => {
       const tool = findTool(call.name);
       const result = tool
-        ? await tool.execute(call.arguments, { patientPhone, doctorId: doctor.id })
+        ? await tool.execute(call.arguments, { patientPhone, doctorId })
         : { error: `Unknown tool: ${call.name}` };
       return { toolCallId: call.id, result: JSON.stringify(result) };
     }),

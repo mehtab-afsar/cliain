@@ -2,7 +2,6 @@ import "server-only";
 import { runAgentTurn } from "./agent-loop";
 import { sendWhatsappText } from "./whatsapp-client";
 import { hasProcessedWamid } from "./conversation-store";
-import { getPrimaryDoctor } from "@/features/appointments/services/doctor-repository";
 
 type InboundMessage = { from: string; wamid: string; text: string };
 
@@ -31,10 +30,9 @@ export function parseInboundMessage(payload: WhatsappWebhookPayload): InboundMes
 }
 
 /** Runs the agent loop for an inbound message and sends the reply back. Dedups by wamid. */
-export async function handleInboundMessage(message: InboundMessage): Promise<void> {
+export async function handleInboundMessage(doctorId: string, message: InboundMessage): Promise<void> {
   if (await hasProcessedWamid(message.wamid)) return;
 
-  const reply = await runAgentTurn(message.from, message.text, message.wamid);
-  const doctor = await getPrimaryDoctor();
-  await sendWhatsappText(doctor.id, message.from, reply);
+  const reply = await runAgentTurn(doctorId, message.from, message.text, message.wamid);
+  await sendWhatsappText(doctorId, message.from, reply);
 }
