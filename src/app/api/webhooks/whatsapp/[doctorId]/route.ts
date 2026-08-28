@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { getWhatsappAppSecret, getWhatsappVerifyToken } from "@/lib/integration-credentials";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { verifyMetaSignature } from "@/lib/webhook-signatures";
 import {
   handleInboundMessage,
@@ -30,10 +31,16 @@ export async function GET(request: Request, { params }: RouteParams) {
 // the response is sent so Meta doesn't retry the delivery mid-processing.
 export async function POST(request: Request, { params }: RouteParams) {
   const { doctorId } = await params;
+
+  const { success } = await checkRateLimit(`whatsapp-webhook:${doctorId}`);
+  if (!success) {
+    return new NextResponse("Too many requests", { status: 429 });
+  }
+
   const rawBody = await request.text();
 
-  // Signature verification is skipped (not skippable) once a clinic has set an app secret —
-  // until then, connecting WhatsApp at all still works, just without this extra check.
+  // An app secret is required to connect WhatsApp at all (see saveIntegrationCredentials), so
+  // this only stays unverified for clinics that connected before that requirement existed.
   const appSecret = await getWhatsappAppSecret(doctorId);
   if (appSecret) {
     const signature = request.headers.get("x-hub-signature-256");
@@ -42,7 +49,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
   }
 
-  const payload = JSON.parse(rawBody);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON.parse's own return type
+  let payload: any;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
   const message = parseInboundMessage(payload);
 
   if (message) {

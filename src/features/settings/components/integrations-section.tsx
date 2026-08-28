@@ -50,7 +50,7 @@ export function IntegrationsSection() {
           {
             key: "appSecret",
             label: "App secret",
-            placeholder: status.whatsapp.hasAppSecret ? undefined : "Recommended — verifies requests came from Meta",
+            placeholder: status.whatsapp.hasAppSecret ? undefined : "Required — verifies requests came from Meta",
             secret: true,
           },
         ]}
@@ -84,7 +84,7 @@ export function IntegrationsSection() {
             label: "Webhook secret",
             placeholder: status.vapi.hasWebhookSecret
               ? undefined
-              : "Recommended — set the same value as your assistant's server secret",
+              : "Required — set the same value as your assistant's server secret",
             secret: true,
           },
         ]}

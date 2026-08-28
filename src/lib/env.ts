@@ -14,6 +14,14 @@ const envSchema = z.object({
   // cloudflared tunnel in dev) — used to build each clinic's Vapi tool webhook URL
   // (<APP_URL>/api/webhooks/vapi/<doctorId>). No trailing slash.
   APP_URL: z.string().optional(),
+  // Rate limiting the public webhook routes (see src/lib/rate-limit.ts) — required on
+  // serverless hosting since there's no shared memory between invocations for an in-process
+  // limiter. Optional: rate limiting just fails open (disabled) without these.
+  UPSTASH_REDIS_REST_URL: z.string().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  // Error monitoring (sentry.server.config.ts / sentry.edge.config.ts). Optional: Sentry.init
+  // no-ops without a DSN, so this is safe to leave unset in local dev.
+  SENTRY_DSN: z.string().optional(),
 });
 
 function undefinedIfEmpty(value: string | undefined): string | undefined {
@@ -29,4 +37,7 @@ export const env = envSchema.parse({
   AUTH_SECRET: undefinedIfEmpty(process.env.AUTH_SECRET),
   CRON_SECRET: undefinedIfEmpty(process.env.CRON_SECRET),
   APP_URL: undefinedIfEmpty(process.env.APP_URL),
+  UPSTASH_REDIS_REST_URL: undefinedIfEmpty(process.env.UPSTASH_REDIS_REST_URL),
+  UPSTASH_REDIS_REST_TOKEN: undefinedIfEmpty(process.env.UPSTASH_REDIS_REST_TOKEN),
+  SENTRY_DSN: undefinedIfEmpty(process.env.SENTRY_DSN),
 });

@@ -124,8 +124,21 @@ export async function saveIntegrationCredentials(
   doctorId: string,
   input: SaveIntegrationInput,
 ): Promise<IntegrationsStatus> {
+  const current = await getDoctorRow(doctorId);
+
   try {
     if (input.provider === "whatsapp") {
+      const willBeConnected = Boolean(
+        (input.phoneNumberId || current?.whatsappPhoneNumberId) &&
+          (input.accessToken || current?.whatsappAccessToken),
+      );
+      const willHaveAppSecret = Boolean(input.appSecret || current?.whatsappAppSecret);
+      if (willBeConnected && !willHaveAppSecret) {
+        throw new Error(
+          "An app secret is required to connect WhatsApp — find it in your Meta App's Basic Settings, so we can verify requests really came from Meta.",
+        );
+      }
+
       await db.doctor.update({
         where: { id: doctorId },
         data: {
@@ -136,6 +149,17 @@ export async function saveIntegrationCredentials(
         },
       });
     } else if (input.provider === "vapi") {
+      const willBeConnected = Boolean(
+        (input.apiKey || current?.vapiApiKey) &&
+          (input.phoneNumberId || current?.vapiPhoneNumberId),
+      );
+      const willHaveWebhookSecret = Boolean(input.webhookSecret || current?.vapiWebhookSecret);
+      if (willBeConnected && !willHaveWebhookSecret) {
+        throw new Error(
+          "A webhook secret is required to connect Vapi — set it to the same value as your assistant's server secret, so we can verify requests really came from Vapi.",
+        );
+      }
+
       await db.doctor.update({
         where: { id: doctorId },
         data: {
