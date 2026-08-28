@@ -1,6 +1,7 @@
 import "server-only";
 import { DateTime } from "luxon";
 import type { Doctor } from "@prisma/client";
+import { resolveTimezone } from "@/lib/timezone";
 
 export type PromptChannel = "text" | "voice";
 
@@ -16,7 +17,7 @@ export function buildSystemPrompt(
   channel: PromptChannel,
   callPurpose?: string,
 ): string {
-  const now = DateTime.now().setZone(doctor.timezone);
+  const now = DateTime.now().setZone(resolveTimezone(doctor.timezone));
   const clinicName = doctor.clinicName ?? doctor.name;
   const medium = channel === "voice" ? "on a phone call" : "texting with a patient on WhatsApp";
 

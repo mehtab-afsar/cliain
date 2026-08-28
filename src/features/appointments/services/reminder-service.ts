@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sendWhatsappTemplate } from "@/features/ai-agent/services/whatsapp-client";
 import { placeOutboundCall } from "@/features/ai-agent/services/vapi-client";
 import { getVapiConfig } from "@/lib/integration-credentials";
+import { resolveTimezone } from "@/lib/timezone";
 
 // Text goes out further ahead as a heads-up; a call goes out closer to the appointment as a
 // stronger nudge (and lets the patient reschedule/cancel by voice on the spot). Both are
@@ -37,7 +38,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
 
     for (const appointment of dueAppointments) {
       const local = DateTime.fromJSDate(appointment.startAt, {
-        zone: appointment.doctor.timezone,
+        zone: resolveTimezone(appointment.doctor.timezone),
       });
       const dateLabel = local.toFormat("cccc, LLL d");
       const timeLabel = local.toFormat("h:mm a");

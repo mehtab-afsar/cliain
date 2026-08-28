@@ -1,6 +1,7 @@
 import "server-only";
 import { DateTime } from "luxon";
 import { db } from "@/lib/db";
+import { resolveTimezone } from "@/lib/timezone";
 import { getDoctorById } from "./doctor-repository";
 
 /** No per-clinic configuration for this yet — one fixed slot length for the MVP. */
@@ -41,7 +42,7 @@ export async function checkAvailability(
   params: CheckAvailabilityParams,
 ): Promise<AvailabilitySlot[]> {
   const doctor = await getDoctorById(doctorId);
-  const zone = doctor.timezone;
+  const zone = resolveTimezone(doctor.timezone);
 
   const localDate = DateTime.fromISO(params.date, { zone });
   if (!localDate.isValid) {

@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { Appointment } from "@prisma/client";
+import { resolveTimezone } from "@/lib/timezone";
 import { getDoctorById } from "./doctor-repository";
 import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "./calendar-sync";
 
@@ -49,7 +50,7 @@ export async function bookAppointment(doctorId: string, input: BookAppointmentIn
       description: input.reason,
       startAt,
       endAt,
-      timezone: doctor.timezone,
+      timezone: resolveTimezone(doctor.timezone),
     });
     await db.appointment.update({
       where: { id: appointment.id },
@@ -119,7 +120,7 @@ export async function rescheduleAppointment(
     await updateCalendarEvent(doctor.id, doctor.googleCalendarId, existing.googleCalendarEventId, {
       startAt,
       endAt,
-      timezone: doctor.timezone,
+      timezone: resolveTimezone(doctor.timezone),
     });
   }
 
