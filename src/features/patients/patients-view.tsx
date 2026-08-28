@@ -2,6 +2,7 @@
 
 import { Users } from "lucide-react";
 import { EmptyState } from "@/features/dashboard-shell/components/empty-state";
+import { PageHeader } from "@/features/dashboard-shell/components/page-header";
 import { usePatients } from "./hooks/use-patients";
 import { PatientList } from "./components/patient-list";
 
@@ -22,7 +23,10 @@ export function PatientsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-2xl text-foreground">Patients</h1>
+      <PageHeader
+        title="Patients"
+        description="Everyone who's messaged or called in, even before they've booked."
+      />
       <PatientList patients={patients} />
     </div>
   );

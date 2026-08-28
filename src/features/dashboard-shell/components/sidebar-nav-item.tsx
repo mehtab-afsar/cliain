@@ -23,10 +23,10 @@ export function SidebarNavItem({ item, isCollapsed, onNavigate }: SidebarNavItem
       onClick={onNavigate}
       data-tour-id={item.tourId}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        isCollapsed && "justify-center px-2",
+        "flex items-center gap-3 rounded-lg border-l-2 border-transparent py-2 pl-[10px] pr-3 text-sm font-medium transition-colors",
+        isCollapsed && "justify-center border-l-0 px-2",
         isActive
-          ? "bg-accent text-accent-foreground"
+          ? "border-primary bg-accent text-accent-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >

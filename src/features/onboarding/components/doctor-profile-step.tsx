@@ -1,3 +1,4 @@
+import { MessageCircle, Stethoscope, UserRound } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { DoctorProfile } from "../types";
@@ -11,7 +12,10 @@ export function DoctorProfileStep({ value, onChange }: DoctorProfileStepProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="doctor-name">Doctor name</Label>
+        <Label htmlFor="doctor-name" className="flex items-center gap-1.5">
+          <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
+          Doctor name
+        </Label>
         <Input
           id="doctor-name"
           placeholder="Dr. Alex Rivera"
@@ -21,7 +25,10 @@ export function DoctorProfileStep({ value, onChange }: DoctorProfileStepProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="doctor-specialty">Specialty</Label>
+        <Label htmlFor="doctor-specialty" className="flex items-center gap-1.5">
+          <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+          Specialty
+        </Label>
         <Input
           id="doctor-specialty"
           placeholder="Family Practice"
@@ -31,7 +38,10 @@ export function DoctorProfileStep({ value, onChange }: DoctorProfileStepProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="doctor-whatsapp">WhatsApp number</Label>
+        <Label htmlFor="doctor-whatsapp" className="flex items-center gap-1.5">
+          <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+          WhatsApp number
+        </Label>
         <Input
           id="doctor-whatsapp"
           type="tel"

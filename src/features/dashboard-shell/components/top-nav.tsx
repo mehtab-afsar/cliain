@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TourMenuItem } from "@/features/product-tour";
+import { LogoMark } from "@/features/landing/components/logo-mark";
 import { MobileSidebar } from "./mobile-sidebar";
 import { SignOutMenuItem } from "./sign-out-menu-item";
 
@@ -22,9 +23,11 @@ export function TopNav({ clinicName, doctorName }: TopNavProps) {
   const initial = (doctorName ?? clinicName ?? "C").trim().charAt(0).toUpperCase();
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4 sm:px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 bg-background shadow-elevation-sm px-4 sm:px-6">
       <div className="flex items-center gap-3">
         <MobileSidebar clinicName={clinicName} />
+        <LogoMark compact />
+        <span className="h-4 w-px bg-border" aria-hidden="true" />
         <p className="text-sm font-medium text-foreground">
           {clinicName ?? "Cliain"}
         </p>

@@ -33,7 +33,7 @@ const STEP_META = [
     label: "Review",
     icon: ClipboardCheck,
     title: "Review and finish",
-    description: "Double-check everything before you go live.",
+    description: "Double-check everything, then Cliain is ready to start answering for you.",
   },
 ];
 
@@ -51,6 +51,7 @@ export function OnboardingView() {
     updateWorkingHoursDay,
     goNext,
     goBack,
+    goToStep,
     finish,
   } = useOnboardingFlow();
 
@@ -95,7 +96,7 @@ export function OnboardingView() {
           onChangeDay={updateWorkingHoursDay}
         />
       ) : null}
-      {stepIndex === 3 ? <ReviewStep draft={draft} /> : null}
+      {stepIndex === 3 ? <ReviewStep draft={draft} onEditStep={goToStep} /> : null}
     </OnboardingLayout>
   );
 }

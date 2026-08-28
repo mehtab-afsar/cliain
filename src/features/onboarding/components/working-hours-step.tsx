@@ -8,7 +8,7 @@ type WorkingHoursStepProps = {
 
 export function WorkingHoursStep({ value, onChangeDay }: WorkingHoursStepProps) {
   return (
-    <div className="divide-y divide-border rounded-xl border border-border bg-card px-5">
+    <div className="divide-y divide-border">
       {value.map((day) => (
         <WorkingHoursDayRow
           key={day.dayOfWeek}

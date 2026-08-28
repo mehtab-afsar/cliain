@@ -1,6 +1,6 @@
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { WorkingHoursDay } from "../types";
+import { TimeSelect } from "./time-select";
 
 type WorkingHoursDayRowProps = {
   day: WorkingHoursDay;
@@ -21,19 +21,9 @@ export function WorkingHoursDayRow({ day, onChange }: WorkingHoursDayRowProps) {
 
       {day.isOpen ? (
         <div className="flex flex-1 items-center gap-2">
-          <Input
-            type="time"
-            value={day.startTime}
-            onChange={(event) => onChange({ startTime: event.target.value })}
-            className="w-32"
-          />
+          <TimeSelect value={day.startTime} onChange={(startTime) => onChange({ startTime })} />
           <span className="text-sm text-muted-foreground">to</span>
-          <Input
-            type="time"
-            value={day.endTime}
-            onChange={(event) => onChange({ endTime: event.target.value })}
-            className="w-32"
-          />
+          <TimeSelect value={day.endTime} onChange={(endTime) => onChange({ endTime })} />
         </div>
       ) : (
         <p className="flex-1 text-sm text-muted-foreground">Closed</p>

@@ -97,6 +97,12 @@ export function useOnboardingFlow() {
     setStepIndex((index) => Math.max(index - 1, 0));
   }, []);
 
+  /** Jumps directly to a step — e.g. an "Edit" link on the review step, skipping validation. */
+  const goToStep = useCallback((index: number) => {
+    setError(null);
+    setStepIndex(Math.min(Math.max(index, 0), ONBOARDING_STEPS.length - 1));
+  }, []);
+
   const finish = useCallback(async () => {
     const validationError = validateStep(stepIndex, draft);
     if (validationError) {
@@ -131,6 +137,7 @@ export function useOnboardingFlow() {
     updateWorkingHoursDay,
     goNext,
     goBack,
+    goToStep,
     finish,
   };
 }

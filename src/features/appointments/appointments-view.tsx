@@ -2,6 +2,7 @@
 
 import { CalendarClock } from "lucide-react";
 import { EmptyState } from "@/features/dashboard-shell/components/empty-state";
+import { PageHeader } from "@/features/dashboard-shell/components/page-header";
 import { useAppointments } from "./hooks/use-appointments";
 import { AppointmentList } from "./components/appointment-list";
 
@@ -22,7 +23,10 @@ export function AppointmentsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-2xl text-foreground">Appointments</h1>
+      <PageHeader
+        title="Appointments"
+        description="Every booking made over WhatsApp or a phone call lands here automatically."
+      />
       <AppointmentList appointments={appointments} />
     </div>
   );

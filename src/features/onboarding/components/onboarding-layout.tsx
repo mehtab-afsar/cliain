@@ -44,16 +44,26 @@ export function OnboardingLayout({
 
       <div className="mx-auto grid w-full max-w-5xl flex-1 gap-x-12 px-6 py-12 lg:grid-cols-[1fr_20rem]">
         <div className="flex w-full max-w-2xl flex-col">
-          <OnboardingStepper steps={steps} currentIndex={stepIndex} />
+          <p className="font-mono text-xs text-muted-foreground">
+            Step {stepIndex + 1} of {steps.length}
+          </p>
+          <div className="mt-3">
+            <OnboardingStepper steps={steps} currentIndex={stepIndex} />
+          </div>
 
           <div className="mt-10">
-            <h1 className="font-heading text-2xl text-foreground sm:text-3xl">
+            <h1 className="font-display-hero font-heading text-2xl text-foreground sm:text-3xl">
               {title}
             </h1>
             <p className="mt-2 text-muted-foreground">{description}</p>
           </div>
 
-          <div className="mt-8 flex-1">{children}</div>
+          <div
+            key={stepIndex}
+            className="mt-8 flex-1 rounded-xl border border-border bg-card p-6 shadow-elevation-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-200"
+          >
+            {children}
+          </div>
 
           {error ? (
             <p className="mt-6 text-sm text-destructive">{error}</p>

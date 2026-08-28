@@ -15,7 +15,7 @@ export function Sidebar({ clinicName }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden shrink-0 border-r border-border bg-sidebar transition-[width] duration-200 md:flex md:flex-col",
+        "hidden shrink-0 border-r border-border bg-sidebar shadow-elevation-sm transition-[width] duration-200 md:flex md:flex-col",
         isCollapsed ? "w-16" : "w-60",
       )}
     >
