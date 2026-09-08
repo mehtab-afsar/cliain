@@ -26,7 +26,10 @@ export const cancelAppointmentTool: ToolDefinition<CancelAppointmentInput> = {
       return { error: "That appointment doesn't belong to this patient." };
     }
 
-    const cancelled = await cancelAppointment(context.doctorId, input.appointmentId);
+    const cancelled = await cancelAppointment(context.doctorId, input.appointmentId, {
+      actor: "ai",
+      channel: context.channel,
+    });
     return { appointment: { id: cancelled.id, status: cancelled.status } };
   },
 };

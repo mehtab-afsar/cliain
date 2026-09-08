@@ -14,5 +14,11 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // These are integration tests against one real shared Postgres instance, not pure unit
+    // tests — running files concurrently lets unrelated Serializable transactions in different
+    // files spuriously conflict with each other (Postgres's own predicate-locking false
+    // positives, not a real bug), producing flaky failures unrelated to what each test
+    // actually checks.
+    fileParallelism: false,
   },
 });

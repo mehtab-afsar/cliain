@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findTool } from "@/features/ai-agent/services/tools";
+import { runTool } from "@/features/ai-agent/services/tools";
 import { getDoctorById } from "@/features/appointments/services/doctor-repository";
 import { getVapiWebhookSecret } from "@/lib/integration-credentials";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -8,6 +8,24 @@ import { verifyVapiSecret } from "@/lib/webhook-signatures";
 type RouteParams = { params: Promise<{ doctorId: string }> };
 
 type VapiToolCall = { id: string; name: string; arguments: Record<string, unknown> };
+
+const TOOL_CALL_TIMEOUT_MS = 2500;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Tool call timed out")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 // Vapi's own model drives the conversation and only calls us to execute a tool. The exact
 // field Vapi uses for the caller's number wasn't confirmed against a live account at build
@@ -93,10 +111,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     const results = await Promise.all(
       toolCalls.map(async (call) => {
         try {
-          const tool = findTool(call.name);
-          const result = tool
-            ? await tool.execute(call.arguments, { patientPhone, doctorId })
-            : { error: `Unknown tool: ${call.name}` };
+          const result = await withTimeout(
+            runTool(call.name, call.arguments, { patientPhone, doctorId, channel: "voice" }),
+            TOOL_CALL_TIMEOUT_MS,
+          );
           return { toolCallId: call.id, result: JSON.stringify(result) };
         } catch (error) {
           console.error(`[vapi-webhook] Tool "${call.name}" failed:`, error);

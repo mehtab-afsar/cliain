@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchAppointments } from "../services/appointment-client";
+import { useCallback, useEffect, useState } from "react";
+import { fetchAppointments, transitionAppointment, type TransitionInput } from "../services/appointment-client";
 import type { AppointmentListItem } from "../types";
 
 export function useAppointments() {
   const [appointments, setAppointments] = useState<AppointmentListItem[] | null>(null);
+
+  const reload = useCallback(() => {
+    fetchAppointments().then(setAppointments);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -17,5 +21,14 @@ export function useAppointments() {
     };
   }, []);
 
-  return { appointments, isLoading: appointments === null };
+  const transition = useCallback(
+    async (id: string, input: TransitionInput) => {
+      const result = await transitionAppointment(id, input);
+      if (result.ok) reload();
+      return result;
+    },
+    [reload],
+  );
+
+  return { appointments, isLoading: appointments === null, transition };
 }

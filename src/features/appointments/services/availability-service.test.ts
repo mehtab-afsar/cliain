@@ -49,11 +49,15 @@ describe("checkAvailability", () => {
       data: { doctorId, phone: `+1555${Date.now()}${Math.floor(Math.random() * 1000)}` },
     });
 
-    await bookAppointment(doctorId, {
-      patientId: patient.id,
-      startAt: `${today}T14:00:00.000Z`,
-      endAt: `${today}T14:30:00.000Z`,
-    });
+    await bookAppointment(
+      doctorId,
+      {
+        patientId: patient.id,
+        startAt: `${today}T14:00:00.000Z`,
+        endAt: `${today}T14:30:00.000Z`,
+      },
+      { actor: "test" },
+    );
 
     const slots = await checkAvailability(doctorId, { date: today });
     expect(slots.some((s) => s.startAt === `${today}T14:00:00.000Z`)).toBe(false);

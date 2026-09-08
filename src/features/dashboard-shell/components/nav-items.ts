@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { CalendarClock, CalendarRange, Settings, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarRange, Settings, Users } from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -14,6 +14,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Appointments",
     icon: CalendarClock,
     tourId: "tour-appointments",
+  },
+  {
+    href: "/dashboard/needs-attention",
+    label: "Needs attention",
+    icon: AlertTriangle,
+    tourId: "tour-needs-attention",
   },
   { href: "/dashboard/patients", label: "Patients", icon: Users, tourId: "tour-patients" },
   {

@@ -2,6 +2,8 @@ import "server-only";
 import type { Doctor } from "@prisma/client";
 import { getVapiConfig, getVapiWebhookSecret } from "@/lib/integration-credentials";
 import { AGENT_MODEL } from "@/lib/anthropic";
+import { resolveSettings } from "@/features/settings/services/settings-repository";
+import type { ClinicSettingsData } from "@/features/settings/schema";
 import { AGENT_TOOLS } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
 
@@ -20,16 +22,18 @@ async function requireVapiConfig(doctorId: string) {
 // implementations used by the WhatsApp channel, unmodified.
 function buildAssistantConfig(
   doctor: Doctor,
+  settings: ClinicSettingsData,
   patientName: string | null,
   callPurpose: string,
   webhookUrl: string,
   webhookSecret: string | null,
 ) {
+  const clinicName = settings.clinic.displayName?.trim() || settings.clinic.name;
   return {
     model: {
       provider: "anthropic",
       model: AGENT_MODEL,
-      systemPrompt: buildSystemPrompt(doctor, patientName, "voice", callPurpose),
+      systemPrompt: buildSystemPrompt(settings, doctor.timezone, patientName, "voice", callPurpose),
       tools: AGENT_TOOLS.map((tool) => ({
         type: "function" as const,
         function: {
@@ -40,7 +44,7 @@ function buildAssistantConfig(
         server: webhookSecret ? { url: webhookUrl, secret: webhookSecret } : { url: webhookUrl },
       })),
     },
-    firstMessage: `Hi${patientName ? ` ${patientName}` : ""}, this is ${doctor.clinicName ?? doctor.name} calling. ${callPurpose}`,
+    firstMessage: `Hi${patientName ? ` ${patientName}` : ""}, this is ${clinicName} calling. ${callPurpose}`,
   };
 }
 
@@ -59,6 +63,7 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
   try {
     const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig(input.doctor.id);
     const webhookSecret = await getVapiWebhookSecret(input.doctor.id);
+    const settings = await resolveSettings(input.doctor.id);
 
     const response = await fetch(`${VAPI_API_BASE}/call`, {
       method: "POST",
@@ -71,6 +76,7 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
         customer: { number: input.toPhone },
         assistant: buildAssistantConfig(
           input.doctor,
+          settings,
           input.patientName,
           input.callPurpose,
           webhookUrl,

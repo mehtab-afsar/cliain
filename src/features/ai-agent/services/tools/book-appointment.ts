@@ -28,12 +28,16 @@ export const bookAppointmentTool: ToolDefinition<BookAppointmentInput> = {
       return { error: "No patient record yet — call create_patient first, then retry." };
     }
     try {
-      const appointment = await bookAppointment(context.doctorId, {
-        patientId: patient.id,
-        startAt: input.startAt,
-        endAt: input.endAt,
-        reason: input.reason,
-      });
+      const appointment = await bookAppointment(
+        context.doctorId,
+        {
+          patientId: patient.id,
+          startAt: input.startAt,
+          endAt: input.endAt,
+          reason: input.reason,
+        },
+        { actor: "ai", channel: context.channel },
+      );
       return {
         appointment: {
           id: appointment.id,

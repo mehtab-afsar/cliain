@@ -1,12 +1,12 @@
 import "server-only";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 
 export type CurrentDoctor = { doctorId: string; role: "owner" | "staff"; userId: string };
 
 /** Null if signed out, or signed in with zero memberships (new user, not yet onboarded/invited). */
 export async function getCurrentDoctor(): Promise<CurrentDoctor | null> {
-  const session = await auth();
+  const session = await getSession();
   const userId = session?.user?.id;
   if (!userId) return null;
 

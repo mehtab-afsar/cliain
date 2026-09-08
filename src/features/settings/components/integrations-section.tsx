@@ -8,8 +8,6 @@ export function IntegrationsSection() {
 
   if (!status) return null;
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -21,13 +19,13 @@ export function IntegrationsSection() {
 
       <IntegrationCard
         title="WhatsApp"
-        description="Lets patients text your clinic and get booked by Claude."
+        description="Lets patients text your clinic and get booked by Cliain."
         connected={status.whatsapp.connected}
         isSaving={savingProvider === "whatsapp"}
         error={errorByProvider.whatsapp}
         webhookUrl={{
           label: "Webhook URL — paste into your Meta App's WhatsApp product",
-          value: `${origin}/api/webhooks/whatsapp/${status.doctorId}`,
+          value: status.webhookUrls?.whatsapp ?? null,
         }}
         fields={[
           {
@@ -59,14 +57,14 @@ export function IntegrationsSection() {
       />
 
       <IntegrationCard
-        title="Voice (Vapi)"
+        title="Phone calls"
         description="Lets patients call in, and lets Cliain place reminder calls."
         connected={status.vapi.connected}
         isSaving={savingProvider === "vapi"}
         error={errorByProvider.vapi}
         webhookUrl={{
-          label: "Tool webhook URL — set as your Vapi assistant's server URL",
-          value: `${origin}/api/webhooks/vapi/${status.doctorId}`,
+          label: "Tool webhook URL — set as your voice assistant's server URL",
+          value: status.webhookUrls?.vapi ?? null,
         }}
         fields={[
           {

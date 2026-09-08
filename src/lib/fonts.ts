@@ -1,15 +1,13 @@
-import { Fraunces, IBM_Plex_Mono, Public_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 
-export const fontHeading = Fraunces({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  axes: ["opsz", "SOFT", "WONK"],
-  display: "swap",
-});
-
-export const fontSans = Public_Sans({
+// One family for everything — heading and body both resolve to this (see globals.css's
+// @theme inline remap of --font-heading to --font-sans). Matches the landing page's own
+// Instrument Sans config exactly, so the whole app reads as one product.
+export const fontSans = Instrument_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -20,4 +18,4 @@ export const fontMono = IBM_Plex_Mono({
   display: "swap",
 });
 
-export const fontVariables = `${fontHeading.variable} ${fontSans.variable} ${fontMono.variable}`;
+export const fontVariables = `${fontSans.variable} ${fontMono.variable}`;

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { acceptInvitation, getInvitationByToken } from "@/features/invitations/services/invitation-service";
 import { InviteMessage } from "@/features/invitations/components/invite-message";
 import { SignInToJoin } from "@/features/invitations/components/sign-in-to-join";
@@ -21,7 +21,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
     );
   }
 
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     return <SignInToJoin token={token} clinicName={lookup.clinicName} />;
   }

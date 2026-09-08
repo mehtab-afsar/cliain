@@ -24,16 +24,16 @@ export async function register() {
   globalThis.__cliainReminderCronStarted = true;
 
   const { default: cron } = await import("node-cron");
-  const { sendDueReminders } = await import(
-    "@/features/appointments/services/reminder-service"
+  const { runScheduledJobs } = await import(
+    "@/features/appointments/services/scheduler-service"
   );
 
   cron.schedule(REMINDER_POLL_CRON, async () => {
     try {
-      const result = await sendDueReminders();
-      if (result.sent > 0 || result.failed > 0) {
+      const { reminders, lifecycle } = await runScheduledJobs();
+      if (reminders.sent > 0 || reminders.failed > 0 || lifecycle.completed > 0 || lifecycle.noShow > 0) {
         console.log(
-          `[reminder-cron] sent=${result.sent} failed=${result.failed}`,
+          `[reminder-cron] sent=${reminders.sent} failed=${reminders.failed} completed=${lifecycle.completed} noShow=${lifecycle.noShow}`,
         );
       }
     } catch (error) {

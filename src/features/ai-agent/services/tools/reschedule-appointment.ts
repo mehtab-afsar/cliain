@@ -33,11 +33,15 @@ export const rescheduleAppointmentTool: ToolDefinition<RescheduleAppointmentInpu
     }
 
     try {
-      const updated = await rescheduleAppointment(context.doctorId, {
-        appointmentId: input.appointmentId,
-        startAt: input.startAt,
-        endAt: input.endAt,
-      });
+      const updated = await rescheduleAppointment(
+        context.doctorId,
+        {
+          appointmentId: input.appointmentId,
+          startAt: input.startAt,
+          endAt: input.endAt,
+        },
+        { actor: "ai", channel: context.channel },
+      );
       return {
         appointment: {
           id: updated.id,

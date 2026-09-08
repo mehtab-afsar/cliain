@@ -9,8 +9,12 @@ import { auth } from "@/lib/auth";
 // the patient-facing endpoints (WhatsApp/Vapi webhooks, `/api/ai/chat`) are
 // intentionally left open — they gate themselves or are protected by their own
 // mechanisms (Meta/Vapi's own request shape, the webhook verify token).
+//
+// Beta bypass (BYPASS_AUTH=true, see src/lib/session.ts) skips this gate entirely — not
+// just for the developer, for anyone who reaches this deployment. Unset before sharing
+// the URL with anyone outside the team.
 export default auth((request) => {
-  if (request.auth?.user) {
+  if (process.env.BYPASS_AUTH === "true" || request.auth?.user) {
     return NextResponse.next();
   }
 

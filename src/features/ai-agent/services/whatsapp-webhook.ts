@@ -34,5 +34,8 @@ export async function handleInboundMessage(doctorId: string, message: InboundMes
   if (await hasProcessedWamid(message.wamid)) return;
 
   const reply = await runAgentTurn(doctorId, message.from, message.text, message.wamid);
-  await sendWhatsappText(doctorId, message.from, reply);
+  // null means this patient has been handed off to staff — send nothing (see agent-loop.ts).
+  if (reply !== null) {
+    await sendWhatsappText(doctorId, message.from, reply);
+  }
 }

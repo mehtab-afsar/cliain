@@ -52,7 +52,7 @@ export function OnboardingLayout({
           </div>
 
           <div className="mt-10">
-            <h1 className="font-display-hero font-heading text-2xl text-foreground sm:text-3xl">
+            <h1 className="font-heading text-2xl text-foreground sm:text-3xl">
               {title}
             </h1>
             <p className="mt-2 text-muted-foreground">{description}</p>

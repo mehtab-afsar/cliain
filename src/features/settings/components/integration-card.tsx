@@ -36,8 +36,10 @@ type IntegrationCardProps = {
   isSaving: boolean;
   onSave: (values: Record<string, string>) => Promise<boolean>;
   onDisconnect: () => Promise<void>;
-  /** A read-only URL this clinic pastes into the provider's own dashboard (Meta/Vapi). */
-  webhookUrl?: { label: string; value: string };
+  /** A read-only URL this clinic pastes into the provider's own dashboard — shown behind an
+   * "Advanced" disclosure, never on the main view. `value` is null when APP_URL isn't
+   * configured (never falls back to a localhost URL). */
+  webhookUrl?: { label: string; value: string | null };
 };
 
 export function IntegrationCard({
@@ -56,7 +58,7 @@ export function IntegrationCard({
   const [justCopied, setJustCopied] = useState(false);
 
   async function handleCopyWebhookUrl() {
-    if (!webhookUrl) return;
+    if (!webhookUrl?.value) return;
     await navigator.clipboard.writeText(webhookUrl.value);
     setJustCopied(true);
     setTimeout(() => setJustCopied(false), 2000);
@@ -111,25 +113,6 @@ export function IntegrationCard({
 
       <form onSubmit={handleSubmit}>
         <CardContent className="flex flex-col gap-4">
-          {webhookUrl ? (
-            <div className="flex flex-col gap-2">
-              <Label>{webhookUrl.label}</Label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 truncate rounded-md border border-border bg-muted px-2.5 py-2 text-xs text-foreground">
-                  {webhookUrl.value}
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleCopyWebhookUrl}
-                  aria-label="Copy webhook URL"
-                >
-                  {justCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          ) : null}
           {fields.map((field) => (
             <div key={field.key} className="flex flex-col gap-2">
               <Label htmlFor={field.key}>{field.label}</Label>
@@ -158,6 +141,37 @@ export function IntegrationCard({
             </div>
           ))}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+          {webhookUrl ? (
+            <details className="group rounded-md border border-border">
+              <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground select-none group-open:text-foreground">
+                Advanced
+              </summary>
+              <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
+                <Label className="text-xs">{webhookUrl.label}</Label>
+                {webhookUrl.value ? (
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 truncate rounded-md border border-border bg-muted px-2.5 py-2 text-xs text-foreground">
+                      {webhookUrl.value}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCopyWebhookUrl}
+                      aria-label="Copy webhook URL"
+                    >
+                      {justCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Set APP_URL in your deployment to see this clinic&apos;s webhook URL.
+                  </p>
+                )}
+              </div>
+            </details>
+          ) : null}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between bg-transparent border-t-0 pt-4">

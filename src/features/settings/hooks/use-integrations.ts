@@ -1,18 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type {
-  IntegrationsStatus,
-  SaveIntegrationInput,
-} from "@/lib/integration-credentials";
+import type { SaveIntegrationInput } from "@/lib/integration-credentials";
 import {
   disconnectIntegration as disconnectIntegrationRequest,
   fetchIntegrationsStatus,
   saveIntegration as saveIntegrationRequest,
+  type IntegrationsStatusWithWebhooks,
 } from "../services/integrations-client";
 
 export function useIntegrations() {
-  const [status, setStatus] = useState<IntegrationsStatus | null>(null);
+  const [status, setStatus] = useState<IntegrationsStatusWithWebhooks | null>(null);
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [errorByProvider, setErrorByProvider] = useState<Record<string, string>>({});
 

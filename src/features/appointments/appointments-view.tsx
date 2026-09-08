@@ -7,7 +7,7 @@ import { useAppointments } from "./hooks/use-appointments";
 import { AppointmentList } from "./components/appointment-list";
 
 export function AppointmentsView() {
-  const { appointments, isLoading } = useAppointments();
+  const { appointments, isLoading, transition } = useAppointments();
 
   if (isLoading) return null;
 
@@ -27,7 +27,7 @@ export function AppointmentsView() {
         title="Appointments"
         description="Every booking made over WhatsApp or a phone call lands here automatically."
       />
-      <AppointmentList appointments={appointments} />
+      <AppointmentList appointments={appointments} onTransition={transition} />
     </div>
   );
 }

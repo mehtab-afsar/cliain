@@ -1,5 +1,5 @@
-import { SettingsView } from "@/features/settings";
+import { redirect } from "next/navigation";
 
 export default function SettingsPage() {
-  return <SettingsView />;
+  redirect("/dashboard/settings/clinic");
 }
