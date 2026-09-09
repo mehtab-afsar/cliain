@@ -1,18 +1,16 @@
 import "server-only";
 import { google } from "googleapis";
-import { getGoogleServiceAccountCredentials } from "@/lib/integration-credentials";
+import { getGoogleCalendarRefreshToken } from "@/lib/integration-credentials";
+import { env } from "@/lib/env";
 
-const CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"];
-
+/** OAuth2Client mints a fresh access token from the stored refresh token on demand — no
+ *  manual token-refresh logic needed here, same as the old JWT client self-minted per request. */
 async function getCalendarClient(doctorId: string) {
-  const credentials = await getGoogleServiceAccountCredentials(doctorId);
-  if (!credentials) return null;
+  const refreshToken = await getGoogleCalendarRefreshToken(doctorId);
+  if (!refreshToken || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
 
-  const auth = new google.auth.JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: CALENDAR_SCOPES,
-  });
+  const auth = new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ refresh_token: refreshToken });
   return google.calendar({ version: "v3", auth });
 }
 

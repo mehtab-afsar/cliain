@@ -35,7 +35,7 @@ Independent, single- or few-location clinics and medical practices — the kind 
 - **Google Calendar sync** — every booking mirrors to a calendar the clinic already uses, one-way and best-effort, so a calendar hiccup never blocks a booking from going through.
 - **A real dashboard** — appointments, patients, and clinic settings in one place, so staff always have a clear picture even though most bookings never touch a human.
 - **Guided onboarding** — a four-step wizard (clinic details, doctor/provider profile, working hours, review) that gets a clinic from signup to a live, bookable AI receptionist in one sitting.
-- **Multi-tenant by design** — one deployment serves many clinics, and each clinic connects its own WhatsApp/Vapi/Calendar credentials. There is no shared fallback credential between clinics, and no clinic can see or affect another's data, bookings, or integrations.
+- **Multi-tenant by design** — one deployment serves many clinics, and each clinic connects its own WhatsApp/Calendar credentials. There is no shared fallback credential between clinics for those, and no clinic can see or affect another's data, bookings, or integrations. Phone calls are the one exception, by design: they run on Cliain's own hosted Vapi account, so a clinic just switches it on rather than holding a credential.
 - **Team access** — a clinic owner can invite staff via a link; each clinic supports multiple team members with role-based access.
 
 ## What makes it different
@@ -47,7 +47,7 @@ Independent, single- or few-location clinics and medical practices — the kind 
 
 ## Trust & data handling
 
-- Every clinic's WhatsApp, Vapi, and Google Calendar credentials are encrypted at rest (AES-256-GCM) and never shared across clinics — there is no fallback credential that could leak one clinic's access to another.
+- Every clinic's WhatsApp and Google Calendar credentials are encrypted at rest (AES-256-GCM) and never shared across clinics — there is no fallback credential that could leak one clinic's access to another. Phone calls run on Cliain's own hosted Vapi account instead of a per-clinic credential; each clinic still gets its own generated (encrypted) webhook secret so one clinic's calls can't be spoofed as another's.
 - Patient conversations are processed by Anthropic's Claude to power the booking agent, and are only ever used to operate the booking service on the clinic's behalf.
 - A double-booking is prevented at the database level (a serializable transaction backs every booking and reschedule), not just checked in application code — verified under real concurrent load, not assumed.
 - Webhook traffic from WhatsApp and Vapi is signature-verified and rate-limited; a malformed or malicious request degrades gracefully instead of crashing a live conversation.
@@ -57,7 +57,7 @@ Independent, single- or few-location clinics and medical practices — the kind 
 
 The core product — WhatsApp booking, voice booking, calendar sync, reminders, onboarding, and the staff dashboard — is built and functionally complete, and has been hardened for a real clinic launch: webhook error isolation so a bad request can't kill a live phone call, required signature verification on both integrations, rate limiting, error monitoring, and an automated test suite covering the booking logic that must never fail (the double-booking guard).
 
-Outstanding before a wider rollout: the Vapi voice payload shape hasn't yet been confirmed against one real live call, and the privacy policy/terms draft hasn't had a lawyer's review. Billing/payments aren't built yet — the product is currently free to run.
+Outstanding before a wider rollout: the Vapi voice payload shape, and the new self-serve phone number provisioning (a clinic clicking "Enable phone calls" in Settings), haven't yet been confirmed against one real live account and a real inbound call — and the privacy policy/terms draft hasn't had a lawyer's review. Billing/payments aren't built yet — the product is currently free to run, and phone calls specifically are a real cost Cliain absorbs per clinic (its own Vapi account, not passed through), which needs pricing before this scales past a handful of clinics.
 
 ## Roadmap
 

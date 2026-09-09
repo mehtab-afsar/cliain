@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,8 @@ type IntegrationCardProps = {
    * "Advanced" disclosure, never on the main view. `value` is null when APP_URL isn't
    * configured (never falls back to a localhost URL). */
   webhookUrl?: { label: string; value: string | null };
+  /** "Where do I find this?" walkthrough for this provider, shown above the fields. */
+  help?: ReactNode;
 };
 
 export function IntegrationCard({
@@ -52,6 +55,7 @@ export function IntegrationCard({
   onSave,
   onDisconnect,
   webhookUrl,
+  help,
 }: IntegrationCardProps) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [justSaved, setJustSaved] = useState(false);
@@ -113,6 +117,7 @@ export function IntegrationCard({
 
       <form onSubmit={handleSubmit}>
         <CardContent className="flex flex-col gap-4">
+          {help}
           {fields.map((field) => (
             <div key={field.key} className="flex flex-col gap-2">
               <Label htmlFor={field.key}>{field.label}</Label>

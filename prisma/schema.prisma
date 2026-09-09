@@ -60,6 +60,10 @@ model Doctor {
   specialty     String?
   whatsappPhone String?
   timezone      String         @default("UTC")
+  // Defaults to "primary" the moment Google Calendar is connected (see the OAuth callback) —
+  // editable afterward if the clinic wants bookings mirrored to a different calendar than
+  // whichever Google account they connected. Also doubles as the "is Calendar sync on for
+  // this booking" gate in appointment-service.ts.
   googleCalendarId String?
   workingHours  WorkingHours[]
   appointments  Appointment[]
@@ -72,8 +76,8 @@ model Doctor {
   updatedAt     DateTime       @updatedAt
 
   // Integration credentials — set from Settings → Integrations, encrypted at rest.
-  // Every clinic connects its own; there is no shared/fallback credential anymore
-  // (a shared fallback would leak one clinic's WhatsApp/Vapi access to every other).
+  // WhatsApp and Google Calendar: every clinic connects its own, there is no shared/fallback
+  // credential (a shared fallback would leak one clinic's WhatsApp access to every other).
   // whatsappPhoneNumberId/vapiPhoneNumberId are unique so two clinics can't silently
   // collide on the same number — Postgres allows multiple NULLs, so unconfigured
   // clinics never conflict with each other.
@@ -83,12 +87,24 @@ model Doctor {
   // Meta's per-App signing secret — verifies inbound webhook deliveries actually came
   // from Meta (HMAC over the raw body, header `X-Hub-Signature-256`).
   whatsappAppSecret       String?
-  vapiApiKey              String?
+  // Phone calls: unlike WhatsApp/Calendar, this is Cliain-hosted — there's no per-clinic API
+  // key. Cliain's own VAPI_API_KEY (env var, not stored here) provisions a number for the
+  // clinic via vapi-provisioning.ts; these two columns just record what got provisioned.
+  // vapiPhoneNumber is the human-readable E.164 number shown in Settings; vapiPhoneNumberId is
+  // Vapi's own resource id, used to address it via their API.
   vapiPhoneNumberId       String? @unique
-  // Echoed back by Vapi as a header on every tool-call request — verifies it actually
-  // came from Vapi, not an outsider who found the webhook URL.
+  vapiPhoneNumber         String?
+  // Generated server-side at provisioning time, not typed by the clinic — echoed back by Vapi
+  // as a header on every request, verifying it actually came from Vapi and not an outsider who
+  // found the webhook URL.
   vapiWebhookSecret       String?
-  googleServiceAccountJson String? @db.Text
+  // Google Calendar: a real "Connect with Google" OAuth flow (see
+  // google-calendar-oauth.ts), not a service-account JSON paste — the clinic clicks a button,
+  // sees Google's normal consent screen, and this refresh token is what lets Cliain mirror
+  // bookings afterward without them staying signed in. googleCalendarAccountEmail is just
+  // display metadata (which Google account is connected), not used for auth.
+  googleCalendarRefreshToken String? @db.Text
+  googleCalendarAccountEmail String?
 
   // Safety/escalation — see AGENT_TOOLS' "escalate" tool. escalationWhatsappNumber is who
   // gets alerted; emergencyScript is spoken/texted verbatim on a red-flag symptom (falls

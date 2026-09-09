@@ -6,7 +6,10 @@ import { OnboardingView } from "@/features/onboarding";
 export default async function OnboardingPage() {
   const session = await getSession();
   if (!session?.user) {
-    redirect("/login?next=/onboarding");
+    // Landing on /onboarding unauthenticated means "new clinic starting fresh" — route
+    // through /signup, not /login, so the copy they see says "Create your account" rather
+    // than "Welcome back".
+    redirect("/signup?next=/onboarding");
   }
 
   const current = await getCurrentDoctor();

@@ -50,9 +50,9 @@ export function SiteHeader() {
             >
               Sign in
             </Link>
-            <a href="#start" className={`${BUTTON.primarySm} ${FOCUS_RING}`}>
+            <Link href="/signup" className={`${BUTTON.primarySm} ${FOCUS_RING}`}>
               Start free
-            </a>
+            </Link>
           </div>
         </nav>
       </div>

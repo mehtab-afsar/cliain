@@ -9,12 +9,13 @@ import {
 } from "@/lib/integration-credentials";
 
 /** Never falls back to request-derived origin (which would be localhost in dev) — null until
- * APP_URL is actually configured, per the "never show a localhost URL" rule. */
+ * APP_URL is actually configured, per the "never show a localhost URL" rule. No `vapi` entry —
+ * that webhook URL is Cliain's own provisioning detail now (set automatically, see
+ * vapi-provisioning.ts), never something a clinic pastes anywhere. */
 function webhookUrls(doctorId: string) {
   if (!env.APP_URL) return null;
   return {
     whatsapp: `${env.APP_URL}/api/webhooks/whatsapp/${doctorId}`,
-    vapi: `${env.APP_URL}/api/webhooks/vapi/${doctorId}`,
   };
 }
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const { doctorId } = await requireCurrentDoctor();
   const { provider } = (await request.json()) as {
-    provider: "whatsapp" | "vapi" | "googleCalendar";
+    provider: "whatsapp" | "googleCalendar";
   };
   const status = await disconnectIntegration(doctorId, provider);
   return NextResponse.json({ ...status, webhookUrls: webhookUrls(doctorId) });

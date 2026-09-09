@@ -7,6 +7,10 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   AUTH_SECRET: z.string().optional(),
+  // Cliain's own Vapi account — phone calls are platform-hosted, not a per-clinic credential.
+  // A clinic clicking "Enable phone calls" in Settings provisions a number on THIS key (see
+  // vapi-provisioning.ts); no clinic ever sees or holds a Vapi API key of their own.
+  VAPI_API_KEY: z.string().optional(),
   // Required to trigger /api/cron/reminders from an external scheduler (e.g. Vercel Cron).
   // The endpoint refuses every request when this isn't set — fails closed, not open.
   CRON_SECRET: z.string().optional(),
@@ -35,6 +39,7 @@ export const env = envSchema.parse({
   GOOGLE_CLIENT_ID: undefinedIfEmpty(process.env.GOOGLE_CLIENT_ID),
   GOOGLE_CLIENT_SECRET: undefinedIfEmpty(process.env.GOOGLE_CLIENT_SECRET),
   AUTH_SECRET: undefinedIfEmpty(process.env.AUTH_SECRET),
+  VAPI_API_KEY: undefinedIfEmpty(process.env.VAPI_API_KEY),
   CRON_SECRET: undefinedIfEmpty(process.env.CRON_SECRET),
   APP_URL: undefinedIfEmpty(process.env.APP_URL),
   UPSTASH_REDIS_REST_URL: undefinedIfEmpty(process.env.UPSTASH_REDIS_REST_URL),

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { SaveIntegrationInput } from "@/lib/integration-credentials";
 import {
   disconnectIntegration as disconnectIntegrationRequest,
+  disableVapi,
+  enableVapi,
   fetchIntegrationsStatus,
   saveIntegration as saveIntegrationRequest,
   type IntegrationsStatusWithWebhooks,
@@ -34,15 +36,39 @@ export function useIntegrations() {
     }
   }, []);
 
-  const disconnect = useCallback(
-    async (provider: "whatsapp" | "vapi" | "googleCalendar") => {
-      setSavingProvider(provider);
-      const next = await disconnectIntegrationRequest(provider);
-      setStatus(next);
-      setSavingProvider(null);
-    },
-    [],
-  );
+  const disconnect = useCallback(async (provider: "whatsapp" | "googleCalendar") => {
+    setSavingProvider(provider);
+    const next = await disconnectIntegrationRequest(provider);
+    setStatus(next);
+    setSavingProvider(null);
+  }, []);
 
-  return { status, savingProvider, errorByProvider, save, disconnect };
+  const enablePhoneCalls = useCallback(async () => {
+    setSavingProvider("vapi");
+    setErrorByProvider((prev) => ({ ...prev, vapi: "" }));
+    const result = await enableVapi();
+    if (result.ok) {
+      setStatus(result.status);
+    } else {
+      setErrorByProvider((prev) => ({ ...prev, vapi: result.error }));
+    }
+    setSavingProvider(null);
+  }, []);
+
+  const disablePhoneCalls = useCallback(async () => {
+    setSavingProvider("vapi");
+    const next = await disableVapi();
+    setStatus(next);
+    setSavingProvider(null);
+  }, []);
+
+  return {
+    status,
+    savingProvider,
+    errorByProvider,
+    save,
+    disconnect,
+    enablePhoneCalls,
+    disablePhoneCalls,
+  };
 }

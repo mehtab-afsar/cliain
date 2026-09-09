@@ -4,6 +4,7 @@ import { getVapiConfig, getVapiWebhookSecret } from "@/lib/integration-credentia
 import { AGENT_MODEL } from "@/lib/anthropic";
 import { resolveSettings } from "@/features/settings/services/settings-repository";
 import type { ClinicSettingsData } from "@/features/settings/schema";
+import { renderGreeting } from "@/features/settings/prompt-render";
 import { AGENT_TOOLS } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
 
@@ -12,23 +13,25 @@ const VAPI_API_BASE = "https://api.vapi.ai";
 async function requireVapiConfig(doctorId: string) {
   const config = await getVapiConfig(doctorId);
   if (!config) {
-    throw new Error("Vapi is not configured for this clinic — connect it from Settings.");
+    throw new Error("Phone calls are not enabled for this clinic — turn it on from Settings.");
   }
   return config;
 }
 
 // Vapi's own model (configured as our same Claude model below) drives the live conversation
 // and speech; it calls back into our webhook only to execute a tool — the same tool
-// implementations used by the WhatsApp channel, unmodified.
-function buildAssistantConfig(
+// implementations used by the WhatsApp channel, unmodified. Shared by both call directions:
+// placeOutboundCall builds one of these inline per reminder call, and the webhook route's
+// "assistant-request" handler builds one per inbound call — same brain either way.
+export function buildAssistantConfig(
   doctor: Doctor,
   settings: ClinicSettingsData,
   patientName: string | null,
-  callPurpose: string,
+  firstMessage: string,
   webhookUrl: string,
   webhookSecret: string | null,
+  callPurpose?: string,
 ) {
-  const clinicName = settings.clinic.displayName?.trim() || settings.clinic.name;
   return {
     model: {
       provider: "anthropic",
@@ -44,8 +47,20 @@ function buildAssistantConfig(
         server: webhookSecret ? { url: webhookUrl, secret: webhookSecret } : { url: webhookUrl },
       })),
     },
-    firstMessage: `Hi${patientName ? ` ${patientName}` : ""}, this is ${clinicName} calling. ${callPurpose}`,
+    firstMessage,
   };
+}
+
+/** For an inbound call, there's no patient identity or call purpose yet — the assistant opens
+ *  with the same greeting a WhatsApp conversation would ("same brain, same rules" per
+ *  system-prompt.ts) and asks who it's speaking with like a real receptionist would. */
+export function buildInboundAssistantConfig(
+  doctor: Doctor,
+  settings: ClinicSettingsData,
+  webhookUrl: string,
+  webhookSecret: string | null,
+) {
+  return buildAssistantConfig(doctor, settings, null, renderGreeting(settings), webhookUrl, webhookSecret);
 }
 
 export type PlaceCallInput = {
@@ -64,6 +79,8 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
     const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig(input.doctor.id);
     const webhookSecret = await getVapiWebhookSecret(input.doctor.id);
     const settings = await resolveSettings(input.doctor.id);
+    const clinicName = settings.clinic.displayName?.trim() || settings.clinic.name;
+    const firstMessage = `Hi${input.patientName ? ` ${input.patientName}` : ""}, this is ${clinicName} calling. ${input.callPurpose}`;
 
     const response = await fetch(`${VAPI_API_BASE}/call`, {
       method: "POST",
@@ -78,9 +95,10 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
           input.doctor,
           settings,
           input.patientName,
-          input.callPurpose,
+          firstMessage,
           webhookUrl,
           webhookSecret,
+          input.callPurpose,
         ),
       }),
     });

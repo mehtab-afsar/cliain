@@ -6,9 +6,10 @@ reminded over WhatsApp — Claude handles the conversation, a voice AI agent
 patients to install, no scheduling software for staff to learn.
 
 Multi-tenant: one deployment serves many clinics. Each clinic connects its
-own WhatsApp/Vapi/Calendar credentials and gets its own webhook URLs — there
-is no shared fallback credential, so one clinic's connection never leaks to
-another's.
+own WhatsApp/Calendar credentials and gets its own webhook URLs — there is no
+shared fallback credential, so one clinic's connection never leaks to
+another's. Phone calls are the exception: hosted on Cliain's own Vapi
+account (see below), not a per-clinic credential.
 
 ## Getting started
 
@@ -110,12 +111,13 @@ types per feature).
 | `product-tour` | Spotlight walkthrough of the dashboard |
 | `ai-agent` | No UI — the Claude tool-calling loop, WhatsApp client/webhook, Vapi voice client/webhook |
 
-## Connecting a clinic's WhatsApp, Vapi, and Google Calendar
+## Connecting a clinic's WhatsApp, phone calls, and Google Calendar
 
-All three are connected **per clinic**, entirely from `/dashboard/settings` →
-Integrations — there's no env var fallback, so a clinic with nothing
-connected simply can't send/receive on that channel yet (no risk of silently
-borrowing another clinic's credentials).
+All three are managed from `/dashboard/settings` → Integrations, but not the
+same way — WhatsApp and Google Calendar are **per-clinic credentials** (no
+env var fallback, so a clinic with nothing connected simply can't
+send/receive on that channel yet); phone calls are **Cliain-hosted**, a
+clinic just clicks a button.
 
 - **WhatsApp Cloud API** — create a Meta App with the WhatsApp product (free
   test number, no business verification needed to start) to get a phone
@@ -125,33 +127,52 @@ borrowing another clinic's credentials).
   You also pick a **verify token** yourself (any string — Meta echoes it back
   during the webhook handshake) and, recommended, paste in the Meta App's
   **App Secret** so inbound deliveries get signature-verified
-  (`X-Hub-Signature-256`) instead of trusted blindly.
-- **Vapi (voice)** — create an account at vapi.ai, buy/connect a phone
-  number, get an API key and phone number ID. This clinic's tool webhook URL
-  (`/api/webhooks/vapi/<doctorId>`) is computed automatically from `APP_URL` —
-  set that as the assistant's server URL in Vapi. Recommended: set a
-  **webhook secret** in Settings and the matching `server.secret` on the Vapi
-  side, so tool-call requests get verified too. The exact webhook payload
-  shape was built from Vapi's docs but not verified against a live account —
-  if `resolvePatientPhone` in `src/app/api/webhooks/vapi/[doctorId]/route.ts`
-  can't find the caller's number, temporarily log the raw payload to see the
-  actual shape.
+  (`X-Hub-Signature-256`) instead of trusted blindly. Settings shows a
+  step-by-step "where do I find this" panel right on the card.
+- **Phone calls (Vapi)** — not a per-clinic credential. Set **your own**
+  `VAPI_API_KEY` (get it from vapi.ai → Dashboard → API Keys) once for the
+  whole deployment; a clinic then clicks "Enable phone calls" in Settings and
+  `vapi-provisioning.ts` creates a phone number for them automatically
+  (`POST /phone-number`, `provider: "vapi"`), with the webhook URL/secret set
+  at creation time — no clinic ever sees a Vapi credential. Inbound calls
+  work by Vapi sending an `assistant-request` message to the webhook on every
+  call (handled in `src/app/api/webhooks/vapi/[doctorId]/route.ts` via
+  `buildInboundAssistantConfig`), so the assistant always reflects this
+  clinic's *current* Settings rather than whatever was true at provisioning
+  time. **Not verified against a live account** — same caveat as before:
+  `provider: "vapi"` numbers are documented as free/instant, but real
+  availability/KYC by country, and the exact webhook payload shape, haven't
+  been confirmed against a real call. If `resolvePatientPhone` in that route
+  can't find the caller's number, or inbound calls don't ring through,
+  temporarily log the raw payload to see the actual shape.
 - **Google Calendar** — create a Google Cloud project, enable the Calendar
   API, create a Service Account, download its JSON key, paste it into
   Settings along with the calendar ID to sync to. Share that calendar with
-  the service account's email first.
+  the service account's email first. (Still service-account based, not an
+  OAuth "Connect" button — a real one-click flow is a natural next step.)
+
+**Reminder/call timing is fixed, not configurable per clinic**: a WhatsApp
+text goes out 24 hours before every appointment, and a WhatsApp text *and*
+a phone call go out 2 hours before (see `reminder-service.ts`) — a
+background poll every 5 minutes, no dashboard to trigger one by hand. What a
+call/message actually *says* comes from the Messaging and Safety tabs
+(greeting, tone, emergency script), not from Integrations.
 
 ## Other env vars
 
 - **`APP_URL`** — this deployment's public base URL (no trailing slash). Used
-  to build every clinic's Vapi webhook URL. In dev, this is your tunnel URL.
+  to build every clinic's WhatsApp/Vapi webhook URLs. In dev, this is your
+  tunnel URL.
+- **`VAPI_API_KEY`** — Cliain's own Vapi account, not a per-clinic value (see
+  above). Leave unset and "Enable phone calls" just stays unavailable in
+  Settings — everything else still works.
 - **`CRON_SECRET`** — only needed if triggering `/api/cron/reminders` from an
   external scheduler (e.g. Vercel Cron) instead of the in-process one. The
   endpoint refuses every request when this isn't set (fails closed), and
   expects `Authorization: Bearer <CRON_SECRET>`.
 - **`INTEGRATION_ENCRYPTION_KEY`** — AES-256-GCM key encrypting every
-  clinic's WhatsApp/Vapi/Calendar secrets at rest. Generate with
-  `openssl rand -base64 32`.
+  clinic's WhatsApp/Calendar secrets (and Cliain's own generated per-clinic
+  Vapi webhook secrets) at rest. Generate with `openssl rand -base64 32`.
 
 ## Stack
 
