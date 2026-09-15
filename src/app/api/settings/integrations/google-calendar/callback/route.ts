@@ -4,6 +4,7 @@ import { requireCurrentDoctor } from "@/lib/current-doctor";
 import { completeGoogleCalendarConnection, GOOGLE_CALENDAR_OAUTH_STATE_COOKIE } from "@/lib/google-calendar-oauth";
 import { encryptSecret } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { startWatchingCalendar } from "@/features/appointments/services/calendar-watch-service";
 
 const SETTINGS_PATH = "/dashboard/settings/integrations";
 
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
   try {
     const { refreshToken, email } = await completeGoogleCalendarConnection(code);
     const current = await db.doctor.findUnique({ where: { id: doctorId }, select: { googleCalendarId: true } });
+    const calendarId = current?.googleCalendarId ?? "primary";
 
     await db.doctor.update({
       where: { id: doctorId },
@@ -46,9 +48,13 @@ export async function GET(request: Request) {
         googleCalendarAccountEmail: email,
         // Preserve a previously chosen calendar across a reconnect; default a fresh connect
         // to the account's own main calendar.
-        ...(current?.googleCalendarId ? {} : { googleCalendarId: "primary" }),
+        ...(current?.googleCalendarId ? {} : { googleCalendarId: calendarId }),
       },
     });
+
+    // Best-effort (never throws) — a failure here (e.g. no public webhook URL configured yet)
+    // must not break the connection itself, only skip real-time sync until the next renewal.
+    await startWatchingCalendar(doctorId, calendarId);
 
     return redirectToSettings(url.origin, "connected");
   } catch (error) {

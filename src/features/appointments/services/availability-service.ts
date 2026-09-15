@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import { db } from "@/lib/db";
 import { resolveTimezone } from "@/lib/timezone";
 import { getDoctorById } from "./doctor-repository";
+import { getBusyIntervals } from "./calendar-sync";
 
 /** No per-clinic configuration for this yet — one fixed slot length for the MVP. */
 export const SLOT_DURATION_MINUTES = 30;
@@ -69,6 +70,12 @@ export async function checkAvailability(
     select: { startAt: true, endAt: true },
   });
 
+  // Time blocked directly on the doctor's real Google Calendar (not booked through this app)
+  // is just as unavailable as a Postgres appointment — same day window as the query above.
+  const calendarBusyIntervals = doctor.googleCalendarId
+    ? await getBusyIntervals(doctor.id, doctor.googleCalendarId, dayStartUtc.toJSDate(), dayEndUtc.toJSDate())
+    : [];
+
   const now = DateTime.now().setZone(zone);
   const slots: AvailabilitySlot[] = [];
 
@@ -83,8 +90,11 @@ export async function checkAvailability(
     const overlapsExisting = existingAppointments.some(
       (appt) => slotStart.toJSDate() < appt.endAt && slotEnd.toJSDate() > appt.startAt,
     );
+    const overlapsCalendarBusy = calendarBusyIntervals.some(
+      (busy) => slotStart.toJSDate() < busy.end && slotEnd.toJSDate() > busy.start,
+    );
 
-    if (!isPast && !overlapsExisting) {
+    if (!isPast && !overlapsExisting && !overlapsCalendarBusy) {
       slots.push({
         startAt: slotStart.toUTC().toISO()!,
         endAt: slotEnd.toUTC().toISO()!,

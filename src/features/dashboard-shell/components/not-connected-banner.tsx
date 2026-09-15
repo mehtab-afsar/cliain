@@ -1,24 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 
 const DISMISS_KEY = "cliain:not-connected-banner-dismissed";
 
-function readDismissed(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return sessionStorage.getItem(DISMISS_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
 /** Shown on every dashboard page until WhatsApp is connected — dismissible per session only
- * (sessionStorage, not localStorage), so it comes back next time the clinic actually needs it. */
+ * (sessionStorage, not localStorage), so it comes back next time the clinic actually needs it.
+ *
+ * Always starts as "not dismissed" on both server and client — sessionStorage doesn't exist
+ * during SSR, so reading it as the initial state (as this used to do) makes the server render
+ * nothing while the client immediately renders the banner, a hydration mismatch on every load.
+ * The real dismissed state is applied after mount instead, in the effect below; that trades a
+ * one-frame flash of the banner (if it was already dismissed this session) for never crashing
+ * hydration, which is the right side of that trade. */
 export function NotConnectedBanner({ whatsappConnected }: { whatsappConnected: boolean }) {
-  const [dismissed, setDismissed] = useState(readDismissed);
+  const [dismissed, setDismissed] = useState(false);
+
+  // Reading an external system (sessionStorage) after mount and syncing it into state is
+  // exactly what this lint rule is otherwise guarding against accidental re-derivation of —
+  // there's no way to do this without an effect, since sessionStorage doesn't exist at SSR time.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(DISMISS_KEY) === "true") setDismissed(true);
+    } catch {
+      // Private browsing or storage disabled — just stays not-dismissed.
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (whatsappConnected || dismissed) return null;
 

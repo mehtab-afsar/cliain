@@ -106,6 +106,22 @@ model Doctor {
   googleCalendarRefreshToken String? @db.Text
   googleCalendarAccountEmail String?
 
+  // Google Calendar push notifications (events.watch) — see calendar-watch-service.ts.
+  // Channel/resource ids identify *this* watch registration so a renewal or stop can address
+  // it; googleCalendarWatchChannelId is unique because the push-notification webhook route
+  // receives only a channel id (no doctorId) and must look up the owning doctor by it.
+  // googleCalendarSyncToken is Calendar's own cursor for incremental events.list reads,
+  // rotated on every successful poll. googleCalendarWatchExpiresAt drives the renewal cron
+  // (Google caps a channel at ~1 month) and googleCalendarWatchToken is compared against each
+  // notification's X-Goog-Channel-Token header — Google's push notifications carry no HMAC,
+  // so this shared secret (generated server-side, never shown to the clinic) is the only proof
+  // a notification actually originated from a watch we registered.
+  googleCalendarWatchChannelId  String?   @unique
+  googleCalendarWatchResourceId String?
+  googleCalendarWatchExpiresAt  DateTime?
+  googleCalendarWatchToken      String?   @db.Text
+  googleCalendarSyncToken       String?   @db.Text
+
   // Safety/escalation — see AGENT_TOOLS' "escalate" tool. escalationWhatsappNumber is who
   // gets alerted; emergencyScript is spoken/texted verbatim on a red-flag symptom (falls
   // back to a hardcoded default in code when unset).

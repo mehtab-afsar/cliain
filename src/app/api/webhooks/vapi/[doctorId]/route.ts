@@ -4,7 +4,7 @@ import { buildInboundAssistantConfig } from "@/features/ai-agent/services/vapi-c
 import { getDoctorById } from "@/features/appointments/services/doctor-repository";
 import { resolveSettings } from "@/features/settings/services/settings-repository";
 import { getVapiWebhookSecret } from "@/lib/integration-credentials";
-import { env } from "@/lib/env";
+import { vapiPublicUrl } from "@/lib/env";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { verifyVapiSecret } from "@/lib/webhook-signatures";
 
@@ -100,14 +100,15 @@ export async function POST(request: Request, { params }: RouteParams) {
     // vapi-provisioning.ts), so Vapi asks here what assistant to run, at the start of every
     // inbound call. Built fresh per call so it always reflects this clinic's current Settings.
     if (payload.message?.type === "assistant-request") {
-      if (!env.APP_URL) {
-        return NextResponse.json({ error: "APP_URL is not configured." }, { status: 500 });
+      const publicUrl = vapiPublicUrl();
+      if (!publicUrl) {
+        return NextResponse.json({ error: "No URL Vapi can reach is configured." }, { status: 500 });
       }
       const settings = await resolveSettings(doctorId);
       const assistant = buildInboundAssistantConfig(
         doctor,
         settings,
-        `${env.APP_URL}/api/webhooks/vapi/${doctorId}`,
+        `${publicUrl}/api/webhooks/vapi/${doctorId}`,
         webhookSecret,
       );
       return NextResponse.json({ assistant });

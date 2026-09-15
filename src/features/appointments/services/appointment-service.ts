@@ -3,9 +3,29 @@ import { db } from "@/lib/db";
 import { Prisma, type Appointment, type AppointmentStatus } from "@prisma/client";
 import { resolveTimezone } from "@/lib/timezone";
 import { getDoctorById } from "./doctor-repository";
-import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "./calendar-sync";
+import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, getBusyIntervals } from "./calendar-sync";
 
 const SLOT_TAKEN_MESSAGE = "That slot was just booked by someone else — please choose another time.";
+
+/**
+ * A best-effort guard against a slot that's free in Postgres but blocked directly on the
+ * doctor's real Google Calendar. Deliberately called BEFORE writeIfSlotFree, not inside its
+ * transaction — an external HTTP call has no place inside a Serializable transaction (it would
+ * hold Postgres locks open across network I/O). This only narrows the race window between
+ * showing a slot and committing the booking, it doesn't eliminate it; getBusyIntervals already
+ * fails open (returns []) on any Calendar error, so this never blocks booking on its own.
+ */
+async function assertNotCalendarBusy(
+  doctor: { id: string; googleCalendarId: string | null },
+  startAt: Date,
+  endAt: Date,
+): Promise<void> {
+  if (!doctor.googleCalendarId) return;
+  const busy = await getBusyIntervals(doctor.id, doctor.googleCalendarId, startAt, endAt);
+  if (busy.some((block) => startAt < block.end && endAt > block.start)) {
+    throw new Error(SLOT_TAKEN_MESSAGE);
+  }
+}
 
 /**
  * A Postgres serialization failure (code 40001) surfaces differently depending on where in
@@ -147,6 +167,8 @@ export async function bookAppointment(
 
   const patient = await db.patient.findFirstOrThrow({ where: { id: input.patientId, doctorId: doctor.id } });
 
+  await assertNotCalendarBusy(doctor, startAt, endAt);
+
   const appointment = await writeIfSlotFree({ doctorId: doctor.id, startAt, endAt }, async (tx) => {
     const created = await tx.appointment.create({
       data: {
@@ -172,6 +194,7 @@ export async function bookAppointment(
     const sync = await createCalendarEvent({
       doctorId: doctor.id,
       calendarId: doctor.googleCalendarId,
+      appointmentId: appointment.id,
       summary: `${patient.name ?? "Patient"} — ${doctor.name}`,
       description: input.reason,
       startAt,
@@ -194,6 +217,10 @@ export async function cancelAppointment(
   appointmentId: string,
   by: Actor,
   reason?: string,
+  // Set by calendar-watch-service.ts when the cancellation is itself the reaction to the
+  // Calendar event having already been deleted externally — calling deleteCalendarEvent in
+  // that case would be a redundant no-op against an event that's already gone.
+  options?: { skipCalendarSync?: boolean },
 ): Promise<Appointment> {
   const doctor = await getDoctorById(doctorId);
   const existing = await db.appointment.findFirstOrThrow({
@@ -202,7 +229,7 @@ export async function cancelAppointment(
 
   const appointment = await transitionStatus(doctorId, appointmentId, "cancelled", by, reason);
 
-  if (doctor.googleCalendarId && existing.googleCalendarEventId) {
+  if (!options?.skipCalendarSync && doctor.googleCalendarId && existing.googleCalendarEventId) {
     await deleteCalendarEvent(doctor.id, doctor.googleCalendarId, existing.googleCalendarEventId);
   }
 
@@ -265,6 +292,8 @@ export async function rescheduleAppointment(
   });
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
+
+  await assertNotCalendarBusy(doctor, startAt, endAt);
 
   const appointment = await writeIfSlotFree(
     { doctorId: doctor.id, startAt, endAt, excludeAppointmentId: existing.id },

@@ -30,3 +30,17 @@ export function verifyVapiSecret(header: string | null, expectedSecret: string):
   if (expectedBuf.length !== actualBuf.length) return false;
   return timingSafeEqual(expectedBuf, actualBuf);
 }
+
+/**
+ * Verifies a Google Calendar push notification's `X-Goog-Channel-Token` header. Google's
+ * push notifications carry no HMAC signature at all — this shared secret, generated server-side
+ * at `events.watch` registration time (see calendar-watch-service.ts) and never shown to the
+ * clinic, is the only proof a notification actually originated from a watch we registered.
+ */
+export function verifyGoogleChannelToken(header: string | null, expectedToken: string): boolean {
+  if (!header) return false;
+  const expectedBuf = Buffer.from(expectedToken);
+  const actualBuf = Buffer.from(header);
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return timingSafeEqual(expectedBuf, actualBuf);
+}

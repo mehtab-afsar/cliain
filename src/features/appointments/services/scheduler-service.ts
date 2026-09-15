@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { resolveTimezone } from "@/lib/timezone";
 import { markNoShow, completeAppointment } from "./appointment-service";
 import { sendDueReminders } from "./reminder-service";
+import { renewExpiringCalendarWatches } from "./calendar-watch-service";
 
 const NO_SHOW_GRACE_MINUTES = 30;
 const AUTO_COMPLETE_GRACE_HOURS = 2;
@@ -85,5 +86,6 @@ export async function autoCompleteAndNoShow(): Promise<{ completed: number; noSh
 export async function runScheduledJobs() {
   const reminders = await sendDueReminders();
   const lifecycle = await autoCompleteAndNoShow();
-  return { reminders, lifecycle };
+  const calendarWatch = await renewExpiringCalendarWatches();
+  return { reminders, lifecycle, calendarWatch };
 }

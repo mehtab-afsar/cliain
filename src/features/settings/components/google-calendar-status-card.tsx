@@ -124,7 +124,12 @@ export function GoogleCalendarStatusCard({
             {isSaving ? "Saving…" : justSaved ? "Saved ✓" : "Save"}
           </Button>
         ) : (
-          <Button type="button" size="sm" render={<a href="/api/settings/integrations/google-calendar/connect" />} disabled={!platformConfigured}>
+          <Button
+            size="sm"
+            nativeButton={false}
+            render={<a href="/api/settings/integrations/google-calendar/connect" />}
+            disabled={!platformConfigured}
+          >
             Connect Google Calendar
           </Button>
         )}

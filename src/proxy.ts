@@ -33,5 +33,6 @@ export const config = {
     "/api/settings/:path*",
     "/api/appointments/:path*",
     "/api/patients/:path*",
+    "/api/dashboard/:path*",
   ],
 };

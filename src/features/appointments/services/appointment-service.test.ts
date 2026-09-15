@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/lib/db";
 import {
   bookAppointment,
@@ -8,6 +8,16 @@ import {
   markNoShow,
   rescheduleAppointment,
 } from "./appointment-service";
+
+// Stubbed rather than hit against a real Google account — every helper here is a no-op
+// (resolves undefined/[]) unless a test explicitly configures it, and is only reached at all
+// when a test's doctor has googleCalendarId set (every other test leaves it unset).
+vi.mock("./calendar-sync", () => ({
+  getBusyIntervals: vi.fn().mockResolvedValue([]),
+  createCalendarEvent: vi.fn().mockResolvedValue({ ok: true, eventId: "evt_test" }),
+  updateCalendarEvent: vi.fn().mockResolvedValue({ ok: true, eventId: "evt_test" }),
+  deleteCalendarEvent: vi.fn().mockResolvedValue({ ok: true, eventId: "evt_test" }),
+}));
 
 async function createDoctorAndPatient() {
   const doctor = await db.doctor.create({ data: { name: "Dr. Test", timezone: "UTC" } });
@@ -90,6 +100,28 @@ describe("bookAppointment", () => {
       where: { doctorId: doctor.id, status: "booked" },
     });
     expect(remaining).toBe(1);
+  });
+
+  it("rejects a slot blocked directly on the doctor's Google Calendar, even with no Postgres conflict", async () => {
+    const { getBusyIntervals } = await import("./calendar-sync");
+    const { doctor, patient } = await createDoctorAndPatient();
+    doctorId = doctor.id;
+    await db.doctor.update({ where: { id: doctor.id }, data: { googleCalendarId: "primary" } });
+
+    vi.mocked(getBusyIntervals).mockResolvedValueOnce([
+      { start: new Date("2026-09-01T18:00:00.000Z"), end: new Date("2026-09-01T18:30:00.000Z") },
+    ]);
+
+    await expect(
+      bookAppointment(
+        doctor.id,
+        { patientId: patient.id, startAt: "2026-09-01T18:00:00.000Z", endAt: "2026-09-01T18:30:00.000Z" },
+        { actor: "test" },
+      ),
+    ).rejects.toThrow("just booked by someone else");
+
+    const remaining = await db.appointment.count({ where: { doctorId: doctor.id } });
+    expect(remaining).toBe(0);
   });
 });
 

@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 
 /** OAuth2Client mints a fresh access token from the stored refresh token on demand — no
  *  manual token-refresh logic needed here, same as the old JWT client self-minted per request. */
-async function getCalendarClient(doctorId: string) {
+export async function getCalendarClient(doctorId: string) {
   const refreshToken = await getGoogleCalendarRefreshToken(doctorId);
   if (!refreshToken || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
 
@@ -21,6 +21,11 @@ export type CalendarSyncResult =
 type EventDetails = {
   doctorId: string;
   calendarId: string;
+  // Tagged onto the Calendar event as extendedProperties.private.appointmentId, so a later
+  // incremental sync (calendar-watch-service.ts) can reliably match an externally-edited
+  // event back to the Appointment row that created it, without relying on googleCalendarEventId
+  // alone (which can't be looked up efficiently from an events.list page).
+  appointmentId: string;
   summary: string;
   description?: string;
   startAt: Date;
@@ -41,6 +46,7 @@ export async function createCalendarEvent(details: EventDetails): Promise<Calend
         description: details.description,
         start: { dateTime: details.startAt.toISOString(), timeZone: details.timezone },
         end: { dateTime: details.endAt.toISOString(), timeZone: details.timezone },
+        extendedProperties: { private: { appointmentId: details.appointmentId } },
       },
     });
     const eventId = response.data.id;
@@ -88,5 +94,44 @@ export async function deleteCalendarEvent(
     return { ok: true, eventId };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown Calendar API error." };
+  }
+}
+
+export type BusyInterval = { start: Date; end: Date };
+
+/**
+ * Reads time blocked directly on the doctor's real Google Calendar (an event created outside
+ * this app, or one of ours) via the purpose-built freebusy endpoint — no paging, and it never
+ * leaks event titles/attendees into availability logic, which matters since `calendarId` may
+ * be the doctor's own primary personal calendar.
+ *
+ * Best-effort, fail-open: a Calendar outage or misconfiguration must never block booking, it
+ * only means this read-back is skipped for that check (the existing Postgres check still runs).
+ */
+export async function getBusyIntervals(
+  doctorId: string,
+  calendarId: string,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<BusyInterval[]> {
+  try {
+    const calendar = await getCalendarClient(doctorId);
+    if (!calendar) return [];
+
+    const { data } = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: windowStart.toISOString(),
+        timeMax: windowEnd.toISOString(),
+        items: [{ id: calendarId }],
+      },
+    });
+
+    const busy = data.calendars?.[calendarId]?.busy ?? [];
+    return busy
+      .filter((block) => block.start && block.end)
+      .map((block) => ({ start: new Date(block.start!), end: new Date(block.end!) }));
+  } catch (error) {
+    console.error(`[calendar-sync] freebusy query failed for doctor ${doctorId}:`, error);
+    return [];
   }
 }

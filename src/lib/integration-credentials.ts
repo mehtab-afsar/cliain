@@ -1,9 +1,10 @@
 import "server-only";
 import { Prisma, type Doctor } from "@prisma/client";
 import { db } from "./db";
-import { env } from "./env";
+import { env, vapiPublicUrl } from "./env";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { googleCalendarConfigured } from "./google-calendar-oauth";
+import { stopWatchingCalendar } from "@/features/appointments/services/calendar-watch-service";
 
 async function getDoctorRow(doctorId: string): Promise<Doctor | null> {
   return db.doctor.findUnique({ where: { id: doctorId } });
@@ -38,17 +39,20 @@ export type VapiConfig = { apiKey: string; phoneNumberId: string; webhookUrl: st
  * Phone calls are Cliain-hosted, not a per-clinic credential — the API key comes from this
  * deployment's own VAPI_API_KEY, never from the doctor row. Only the phone number (provisioned
  * via vapi-provisioning.ts) and the webhook URL are per-clinic. The webhook URL itself is
- * computed, not stored — fully deterministic (APP_URL + this doctor's id), so there's no
- * separate copy that could drift from the real thing.
+ * computed, not stored — fully deterministic (vapiPublicUrl() + this doctor's id), so there's
+ * no separate copy that could drift from the real thing. Uses vapiPublicUrl(), NOT APP_URL
+ * directly — Vapi's servers need a URL reachable from the internet even in local dev (a real
+ * tunnel), which can differ from the plain APP_URL a browser uses for sign-in/Calendar.
  */
 export async function getVapiConfig(doctorId: string): Promise<VapiConfig | null> {
-  if (!env.VAPI_API_KEY || !env.APP_URL) return null;
+  const publicUrl = vapiPublicUrl();
+  if (!env.VAPI_API_KEY || !publicUrl) return null;
   const doctor = await getDoctorRow(doctorId);
   if (!doctor?.vapiPhoneNumberId) return null;
   return {
     apiKey: env.VAPI_API_KEY,
     phoneNumberId: doctor.vapiPhoneNumberId,
-    webhookUrl: `${env.APP_URL}/api/webhooks/vapi/${doctorId}`,
+    webhookUrl: `${publicUrl}/api/webhooks/vapi/${doctorId}`,
   };
 }
 
@@ -101,7 +105,7 @@ export async function getIntegrationsStatus(doctorId: string): Promise<Integrati
     vapi: {
       connected: Boolean(doctor?.vapiPhoneNumberId),
       phoneNumber: doctor?.vapiPhoneNumber ?? null,
-      platformConfigured: Boolean(env.VAPI_API_KEY && env.APP_URL),
+      platformConfigured: Boolean(env.VAPI_API_KEY && vapiPublicUrl()),
     },
     googleCalendar: {
       connected: Boolean(doctor?.googleCalendarRefreshToken),
@@ -198,6 +202,11 @@ export async function disconnectIntegration(
       },
     });
   } else {
+    // Before dropping the refresh token: tell Google to stop sending push notifications for
+    // this doctor's watch channel. Otherwise an orphaned channel keeps firing, and
+    // reconcileCalendarChanges would then find no usable OAuth client and fail quietly forever.
+    await stopWatchingCalendar(doctorId);
+
     await db.doctor.update({
       where: { id: doctorId },
       data: {

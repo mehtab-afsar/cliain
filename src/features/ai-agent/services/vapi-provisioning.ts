@@ -1,11 +1,21 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
-import { env } from "@/lib/env";
+import { env, vapiPublicUrl } from "@/lib/env";
 import { encryptSecret } from "@/lib/crypto";
 import { isUniqueConstraintError } from "@/lib/integration-credentials";
 
 const VAPI_API_BASE = "https://api.vapi.ai";
+
+// Confirmed live against a real Vapi account (2026-09): a `provider: "vapi"` (free, instant)
+// number REQUIRES a `numberDesiredAreaCode`, and availability shifts constantly — 415 was
+// rejected outright, 571 worked. These are tried in order, stopping at the first one that
+// works; only US area codes are offered by Vapi's free tier at all, so this is a US number
+// regardless of which clinic requests it — a real product gap for a non-US clinic (an Indian
+// clinic's patients would be dialing a US number), not something fixable from this side alone;
+// a real deployment would want a purchased/imported local number (e.g. via Twilio import)
+// instead once that matters.
+const CANDIDATE_AREA_CODES = ["571", "502", "585", "212", "628"];
 
 export type ProvisionResult = { ok: true; phoneNumber: string } | { ok: false; error: string };
 
@@ -19,45 +29,55 @@ export type ProvisionResult = { ok: true; phoneNumber: string } | { ok: false; e
  * than a fixed assistant baked in at provisioning time. That's what keeps a call in sync with
  * whatever the clinic's Settings say *right now* — greeting, tone, escalation number — instead
  * of whatever was true the day the number was created.
- *
- * Not verified against a live Vapi account: `provider: "vapi"` numbers are documented as
- * free/instant, but real availability, calling-code support, and any KYC requirement varies by
- * country — confirm this against a real account (and a real inbound test call) before relying
- * on it for a launch, the same caveat already on the outbound call path in vapi-client.ts.
  */
 export async function provisionVapiForDoctor(doctorId: string, clinicName: string): Promise<ProvisionResult> {
   if (!env.VAPI_API_KEY) {
     return { ok: false, error: "Phone calls aren't available on this deployment yet — Cliain hasn't connected its Vapi account." };
   }
-  if (!env.APP_URL) {
-    return { ok: false, error: "Phone calls aren't available on this deployment yet — APP_URL isn't configured." };
+  const publicUrl = vapiPublicUrl();
+  if (!publicUrl) {
+    return { ok: false, error: "Phone calls aren't available on this deployment yet — no URL Vapi can reach is configured." };
   }
 
   const webhookSecret = randomBytes(24).toString("hex");
 
   try {
-    const response = await fetch(`${VAPI_API_BASE}/phone-number`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.VAPI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        provider: "vapi",
-        name: clinicName,
-        server: {
-          url: `${env.APP_URL}/api/webhooks/vapi/${doctorId}`,
-          secret: webhookSecret,
-        },
-      }),
-    });
+    let lastError = "Vapi has no phone numbers available right now — try again shortly.";
+    let data: { id: string; number: string } | null = null;
 
-    if (!response.ok) {
+    for (const areaCode of CANDIDATE_AREA_CODES) {
+      const response = await fetch(`${VAPI_API_BASE}/phone-number`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.VAPI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          provider: "vapi",
+          numberDesiredAreaCode: areaCode,
+          name: clinicName,
+          server: {
+            url: `${publicUrl}/api/webhooks/vapi/${doctorId}`,
+            secret: webhookSecret,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        data = (await response.json()) as { id: string; number: string };
+        break;
+      }
+
       const body = await response.text();
-      return { ok: false, error: `Vapi rejected the request (${response.status}): ${body}` };
+      lastError = `Vapi rejected the request (${response.status}): ${body}`;
+      // Only keep trying other area codes for an availability problem — any other error
+      // (auth, malformed request) will fail identically on every subsequent attempt too.
+      if (!body.toLowerCase().includes("area code")) break;
     }
 
-    const data = (await response.json()) as { id: string; number: string };
+    if (!data) {
+      return { ok: false, error: lastError };
+    }
 
     await db.doctor.update({
       where: { id: doctorId },

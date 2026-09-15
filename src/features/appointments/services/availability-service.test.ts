@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 import { checkAvailability } from "./availability-service";
 import { bookAppointment } from "./appointment-service";
 
+// Stubbed rather than hit against a real Google account — checkAvailability only calls this
+// at all when doctor.googleCalendarId is set (see below), so every other test in this file is
+// unaffected by the mock.
+vi.mock("./calendar-sync", () => ({ getBusyIntervals: vi.fn() }));
+
 // Fixed so past-slot filtering (which compares against the real clock) is deterministic
 // regardless of when the suite actually runs.
 const FAKE_NOW = "2026-09-01T12:00:00.000Z";
@@ -113,5 +118,34 @@ describe("checkAvailability", () => {
     await expect(checkAvailability(doctorId, { date: "not-a-date" })).rejects.toThrow(
       'Invalid date "not-a-date"',
     );
+  });
+
+  it("excludes a slot blocked directly on the doctor's Google Calendar", async () => {
+    const { getBusyIntervals } = await import("./calendar-sync");
+    const now = DateTime.fromISO(FAKE_NOW, { zone: "utc" });
+    const today = now.toISODate()!;
+    const doctor = await createDoctorWithHours(now.weekday % 7, "09:00", "17:00");
+    doctorId = doctor.id;
+    await db.doctor.update({ where: { id: doctorId }, data: { googleCalendarId: "primary" } });
+
+    vi.mocked(getBusyIntervals).mockResolvedValueOnce([
+      { start: new Date(`${today}T15:00:00.000Z`), end: new Date(`${today}T15:30:00.000Z`) },
+    ]);
+
+    const slots = await checkAvailability(doctorId, { date: today });
+    expect(slots.some((s) => s.startAt === `${today}T15:00:00.000Z`)).toBe(false);
+    // An untouched neighboring slot should still be offered.
+    expect(slots.some((s) => s.startAt === `${today}T13:00:00.000Z`)).toBe(true);
+  });
+
+  it("doesn't query Google Calendar when no calendar is connected", async () => {
+    const { getBusyIntervals } = await import("./calendar-sync");
+    vi.mocked(getBusyIntervals).mockClear();
+    const now = DateTime.fromISO(FAKE_NOW, { zone: "utc" });
+    const doctor = await createDoctorWithHours(now.weekday % 7, "09:00", "17:00");
+    doctorId = doctor.id;
+
+    await checkAvailability(doctorId, { date: now.toISODate()! });
+    expect(getBusyIntervals).not.toHaveBeenCalled();
   });
 });
