@@ -1,9 +1,10 @@
 import "server-only";
-import type { Doctor } from "@prisma/client";
+import type { Tenant } from "@prisma/client";
 import { getVapiConfig, getVapiWebhookSecret } from "@/lib/integration-credentials";
 import { AGENT_MODEL } from "@/lib/anthropic";
-import { resolveSettings } from "@/features/settings/services/settings-repository";
+import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
 import type { ClinicSettingsData } from "@/features/settings/schema";
+import type { TemplateContent } from "@/features/templates/types";
 import { renderGreeting } from "@/features/settings/prompt-render";
 import { AGENT_TOOLS } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
@@ -24,7 +25,8 @@ async function requireVapiConfig(doctorId: string) {
 // placeOutboundCall builds one of these inline per reminder call, and the webhook route's
 // "assistant-request" handler builds one per inbound call — same brain either way.
 export function buildAssistantConfig(
-  doctor: Doctor,
+  template: TemplateContent,
+  doctor: Tenant,
   settings: ClinicSettingsData,
   patientName: string | null,
   firstMessage: string,
@@ -36,7 +38,7 @@ export function buildAssistantConfig(
     model: {
       provider: "anthropic",
       model: AGENT_MODEL,
-      systemPrompt: buildSystemPrompt(settings, doctor.timezone, patientName, "voice", callPurpose),
+      systemPrompt: buildSystemPrompt(template, settings, doctor.timezone, patientName, "voice", callPurpose),
       tools: AGENT_TOOLS.map((tool) => ({
         type: "function" as const,
         function: {
@@ -55,16 +57,17 @@ export function buildAssistantConfig(
  *  with the same greeting a WhatsApp conversation would ("same brain, same rules" per
  *  system-prompt.ts) and asks who it's speaking with like a real receptionist would. */
 export function buildInboundAssistantConfig(
-  doctor: Doctor,
+  template: TemplateContent,
+  doctor: Tenant,
   settings: ClinicSettingsData,
   webhookUrl: string,
   webhookSecret: string | null,
 ) {
-  return buildAssistantConfig(doctor, settings, null, renderGreeting(settings), webhookUrl, webhookSecret);
+  return buildAssistantConfig(template, doctor, settings, null, renderGreeting(settings), webhookUrl, webhookSecret);
 }
 
 export type PlaceCallInput = {
-  doctor: Doctor;
+  doctor: Tenant;
   toPhone: string;
   patientName: string | null;
   /** Spoken as part of the opening line and given to the model as context, e.g. "to confirm your appointment tomorrow at 3:00 PM". */
@@ -78,7 +81,8 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
   try {
     const { apiKey, phoneNumberId, webhookUrl } = await requireVapiConfig(input.doctor.id);
     const webhookSecret = await getVapiWebhookSecret(input.doctor.id);
-    const settings = await resolveSettings(input.doctor.id);
+    const { template, settings: rawSettings } = await resolveTenantConfig(input.doctor.id);
+    const settings = rawSettings as ClinicSettingsData;
     const clinicName = settings.clinic.displayName?.trim() || settings.clinic.name;
     const firstMessage = `Hi${input.patientName ? ` ${input.patientName}` : ""}, this is ${clinicName} calling. ${input.callPurpose}`;
 
@@ -92,6 +96,7 @@ export async function placeOutboundCall(input: PlaceCallInput): Promise<PlaceCal
         phoneNumberId,
         customer: { number: input.toPhone },
         assistant: buildAssistantConfig(
+          template,
           input.doctor,
           settings,
           input.patientName,

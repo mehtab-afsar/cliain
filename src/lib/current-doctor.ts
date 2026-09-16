@@ -18,7 +18,7 @@ export async function getCurrentDoctor(): Promise<CurrentDoctor | null> {
   });
   if (!membership) return null;
 
-  return { doctorId: membership.doctorId, role: membership.role, userId };
+  return { doctorId: membership.tenantId, role: membership.role, userId };
 }
 
 /** Throws — use in API routes/services that require an authenticated, onboarded tenant. */

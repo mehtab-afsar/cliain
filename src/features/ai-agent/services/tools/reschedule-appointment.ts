@@ -24,17 +24,17 @@ export const rescheduleAppointmentTool: ToolDefinition<RescheduleAppointmentInpu
     required: ["appointmentId", "startAt", "endAt"],
   },
   async execute(input, context) {
-    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
+    const patient = await getPatientByPhone(context.tenantId, context.patientPhone);
     if (!patient) return { error: "No patient record found for this number." };
 
-    const appointment = await db.appointment.findUnique({ where: { id: input.appointmentId } });
-    if (!appointment || appointment.patientId !== patient.id) {
+    const appointment = await db.booking.findUnique({ where: { id: input.appointmentId } });
+    if (!appointment || appointment.customerId !== patient.id) {
       return { error: "That appointment doesn't belong to this patient." };
     }
 
     try {
       const updated = await rescheduleAppointment(
-        context.doctorId,
+        context.tenantId,
         {
           appointmentId: input.appointmentId,
           startAt: input.startAt,

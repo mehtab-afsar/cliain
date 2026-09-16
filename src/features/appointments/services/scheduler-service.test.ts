@@ -7,27 +7,33 @@ import { autoCompleteAndNoShow } from "./scheduler-service";
 const FAKE_NOW = "2026-09-01T20:00:00.000Z";
 
 async function createDoctorWithHours() {
-  const doctor = await db.doctor.create({ data: { name: "Dr. Test", timezone: "UTC" } });
+  const doctor = await db.tenant.create({ data: { timezone: "UTC" } });
+  const location = await db.location.create({ data: { tenantId: doctor.id, timezone: "UTC" } });
+  const resource = await db.resource.create({
+    data: { tenantId: doctor.id, locationId: location.id, type: "practitioner", name: "Dr. Test" },
+  });
+  await db.offering.create({
+    data: { tenantId: doctor.id, name: "Consultation", durationMinutes: 30, resourceType: "practitioner" },
+  });
   // 09:00-17:00 on every weekday so whichever day FAKE_NOW's date falls has known hours.
   await db.workingHours.createMany({
     data: Array.from({ length: 7 }, (_, dayOfWeek) => ({
-      doctorId: doctor.id,
+      resourceId: resource.id,
       dayOfWeek,
       isOpen: true,
       startTime: "09:00",
       endTime: "17:00",
     })),
   });
-  const patient = await db.patient.create({
-    data: { doctorId: doctor.id, phone: `+1555${Date.now()}${Math.floor(Math.random() * 1000)}` },
+  const patient = await db.customer.create({
+    data: { tenantId: doctor.id, phone: `+1555${Date.now()}${Math.floor(Math.random() * 1000)}` },
   });
   return { doctor, patient };
 }
 
 async function cleanup(doctorId: string) {
-  await db.appointment.deleteMany({ where: { doctorId } });
-  await db.workingHours.deleteMany({ where: { doctorId } });
-  await db.doctor.delete({ where: { id: doctorId } });
+  await db.booking.deleteMany({ where: { tenantId: doctorId } });
+  await db.tenant.delete({ where: { id: doctorId } });
 }
 
 describe("autoCompleteAndNoShow", () => {
@@ -56,7 +62,7 @@ describe("autoCompleteAndNoShow", () => {
 
     await autoCompleteAndNoShow();
 
-    const updated = await db.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+    const updated = await db.booking.findUniqueOrThrow({ where: { id: appointment.id } });
     expect(updated.status).toBe("no_show");
   });
 
@@ -73,7 +79,7 @@ describe("autoCompleteAndNoShow", () => {
 
     await autoCompleteAndNoShow();
 
-    const updated = await db.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+    const updated = await db.booking.findUniqueOrThrow({ where: { id: appointment.id } });
     expect(updated.status).toBe("completed");
     expect(updated.completedAt).not.toBeNull();
   });
@@ -91,7 +97,7 @@ describe("autoCompleteAndNoShow", () => {
 
     await autoCompleteAndNoShow();
 
-    const updated = await db.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+    const updated = await db.booking.findUniqueOrThrow({ where: { id: appointment.id } });
     expect(updated.status).toBe("booked");
   });
 
@@ -108,10 +114,10 @@ describe("autoCompleteAndNoShow", () => {
     await autoCompleteAndNoShow();
     await autoCompleteAndNoShow();
 
-    const updated = await db.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+    const updated = await db.booking.findUniqueOrThrow({ where: { id: appointment.id } });
     expect(updated.status).toBe("no_show");
 
-    const events = await db.appointmentEvent.findMany({ where: { appointmentId: appointment.id } });
+    const events = await db.bookingEvent.findMany({ where: { bookingId: appointment.id } });
     expect(events.filter((e) => e.toStatus === "no_show")).toHaveLength(1);
   });
 });

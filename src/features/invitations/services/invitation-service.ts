@@ -18,7 +18,7 @@ function inviteUrl(origin: string, token: string): string {
 }
 
 export async function createInvitation(
-  doctorId: string,
+  tenantId: string,
   createdByUserId: string,
   origin: string,
   role: MembershipRole = "staff",
@@ -26,7 +26,7 @@ export async function createInvitation(
   const token = randomBytes(24).toString("base64url");
   const invitation = await db.invitation.create({
     data: {
-      doctorId,
+      tenantId,
       token,
       role,
       createdByUserId,
@@ -43,11 +43,11 @@ export async function createInvitation(
 }
 
 export async function listOutstandingInvitations(
-  doctorId: string,
+  tenantId: string,
   origin: string,
 ): Promise<InvitationSummary[]> {
   const invitations = await db.invitation.findMany({
-    where: { doctorId, acceptedAt: null, expiresAt: { gt: new Date() } },
+    where: { tenantId, acceptedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
   return invitations.map((invitation) => ({
@@ -59,28 +59,28 @@ export async function listOutstandingInvitations(
   }));
 }
 
-export async function revokeInvitation(doctorId: string, invitationId: string): Promise<void> {
-  await db.invitation.deleteMany({ where: { id: invitationId, doctorId } });
+export async function revokeInvitation(tenantId: string, invitationId: string): Promise<void> {
+  await db.invitation.deleteMany({ where: { id: invitationId, tenantId } });
 }
 
 export type InvitationLookup =
-  | { status: "valid"; doctorId: string; clinicName: string | null }
+  | { status: "valid"; tenantId: string; clinicName: string | null }
   | { status: "invalid" };
 
 export async function getInvitationByToken(token: string): Promise<InvitationLookup> {
-  const invitation = await db.invitation.findUnique({ where: { token }, include: { doctor: true } });
+  const invitation = await db.invitation.findUnique({ where: { token }, include: { tenant: true } });
   if (!invitation || invitation.acceptedAt || invitation.expiresAt < new Date()) {
     return { status: "invalid" };
   }
-  return { status: "valid", doctorId: invitation.doctorId, clinicName: invitation.doctor.clinicName };
+  return { status: "valid", tenantId: invitation.tenantId, clinicName: invitation.tenant.clinicName };
 }
 
 export type AcceptInvitationResult =
-  | { status: "joined"; doctorId: string }
+  | { status: "joined"; tenantId: string }
   | { status: "already-member-elsewhere" }
   | { status: "invalid" };
 
-/** No org-switcher exists yet, so a user already belonging to any clinic is blocked rather than silently added to a second one. */
+/** No org-switcher exists yet, so a user already belonging to any tenant is blocked rather than silently added to a second one. */
 export async function acceptInvitation(token: string, userId: string): Promise<AcceptInvitationResult> {
   const invitation = await db.invitation.findUnique({ where: { token } });
   if (!invitation || invitation.acceptedAt || invitation.expiresAt < new Date()) {
@@ -93,14 +93,14 @@ export async function acceptInvitation(token: string, userId: string): Promise<A
   }
 
   await db.$transaction([
-    db.membership.create({ data: { userId, doctorId: invitation.doctorId, role: invitation.role } }),
+    db.membership.create({ data: { userId, tenantId: invitation.tenantId, role: invitation.role } }),
     db.invitation.update({
       where: { id: invitation.id },
       data: { acceptedAt: new Date(), acceptedByUserId: userId },
     }),
   ]);
 
-  return { status: "joined", doctorId: invitation.doctorId };
+  return { status: "joined", tenantId: invitation.tenantId };
 }
 
 export type TeamMember = {
@@ -111,9 +111,9 @@ export type TeamMember = {
   role: MembershipRole;
 };
 
-export async function listTeamMembers(doctorId: string): Promise<TeamMember[]> {
+export async function listTeamMembers(tenantId: string): Promise<TeamMember[]> {
   const memberships = await db.membership.findMany({
-    where: { doctorId },
+    where: { tenantId },
     include: { user: true },
     orderBy: { createdAt: "asc" },
   });

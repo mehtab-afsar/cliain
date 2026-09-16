@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runAgentTurn } from "@/features/ai-agent/services/agent-loop";
+import { mintToolToken } from "@/features/ai-agent/services/tool-token";
 
 // Direct test endpoint for the agent loop — bypasses WhatsApp entirely. doctorId identifies
 // which clinic to test against (find yours in Settings → Integrations, or the dashboard URL).
@@ -22,7 +23,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const reply = await runAgentTurn(doctorId, phone, message);
+    // Dev-only route, no real signature to verify — mints straight from the caller-supplied
+    // doctorId, matching this endpoint's existing "trust whatever id you're given" contract
+    // (see the file-level comment). Never do this outside a route already documented as such.
+    const toolToken = mintToolToken({ tenantId: doctorId, channel: "whatsapp" });
+    const reply = await runAgentTurn(toolToken, phone, message);
     return NextResponse.json({ reply });
   } catch (error) {
     return NextResponse.json(

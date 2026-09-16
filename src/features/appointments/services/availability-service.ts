@@ -2,16 +2,13 @@ import "server-only";
 import { DateTime } from "luxon";
 import { db } from "@/lib/db";
 import { resolveTimezone } from "@/lib/timezone";
-import { getDoctorById } from "./doctor-repository";
+import { getPrimaryResourceForTenant, getPrimaryOfferingForTenant, getTenantById } from "./doctor-repository";
 import { getBusyIntervals } from "./calendar-sync";
-
-/** No per-clinic configuration for this yet — one fixed slot length for the MVP. */
-export const SLOT_DURATION_MINUTES = 30;
 
 export type AvailabilitySlot = {
   startAt: string; // ISO, UTC
   endAt: string; // ISO, UTC
-  label: string; // e.g. "2:30 PM", in the doctor's local time
+  label: string; // e.g. "2:30 PM", in the resource's local time
 };
 
 function parseHoursMinutes(value: string): { hour: number; minute: number } {
@@ -33,17 +30,20 @@ function clampTime(
 }
 
 export type CheckAvailabilityParams = {
-  date: string; // "YYYY-MM-DD", local to the doctor's timezone
+  date: string; // "YYYY-MM-DD", local to the resource's timezone
   earliestTime?: string; // "HH:MM", local — optional lower bound
   latestTime?: string; // "HH:MM", local — optional upper bound
 };
 
 export async function checkAvailability(
-  doctorId: string,
+  tenantId: string,
   params: CheckAvailabilityParams,
 ): Promise<AvailabilitySlot[]> {
-  const doctor = await getDoctorById(doctorId);
-  const zone = resolveTimezone(doctor.timezone);
+  const tenant = await getTenantById(tenantId);
+  const resource = await getPrimaryResourceForTenant(tenantId);
+  const offering = await getPrimaryOfferingForTenant(tenantId);
+  const zone = resolveTimezone(resource.location.timezone ?? tenant.timezone);
+  const slotDurationMinutes = offering.durationMinutes;
 
   const localDate = DateTime.fromISO(params.date, { zone });
   if (!localDate.isValid) {
@@ -51,7 +51,7 @@ export async function checkAvailability(
   }
   const dayOfWeek = localDate.weekday % 7; // luxon: Mon=1..Sun=7 -> our 0=Sun..6=Sat
 
-  const hours = doctor.workingHours.find((day) => day.dayOfWeek === dayOfWeek);
+  const hours = resource.workingHours.find((day) => day.dayOfWeek === dayOfWeek);
   if (!hours || !hours.isOpen) return [];
 
   const rangeStart = clampTime(parseHoursMinutes(hours.startTime), params.earliestTime, "max");
@@ -60,9 +60,9 @@ export async function checkAvailability(
   const dayStartUtc = localDate.startOf("day").toUTC();
   const dayEndUtc = localDate.endOf("day").toUTC();
 
-  const existingAppointments = await db.appointment.findMany({
+  const existingBookings = await db.booking.findMany({
     where: {
-      doctorId: doctor.id,
+      resourceId: resource.id,
       status: "booked",
       startAt: { lt: dayEndUtc.toJSDate() },
       endAt: { gt: dayStartUtc.toJSDate() },
@@ -70,10 +70,10 @@ export async function checkAvailability(
     select: { startAt: true, endAt: true },
   });
 
-  // Time blocked directly on the doctor's real Google Calendar (not booked through this app)
-  // is just as unavailable as a Postgres appointment — same day window as the query above.
-  const calendarBusyIntervals = doctor.googleCalendarId
-    ? await getBusyIntervals(doctor.id, doctor.googleCalendarId, dayStartUtc.toJSDate(), dayEndUtc.toJSDate())
+  // Time blocked directly on the resource's real Google Calendar (not booked through this app)
+  // is just as unavailable as a Postgres booking — same day window as the query above.
+  const calendarBusyIntervals = tenant.googleCalendarId
+    ? await getBusyIntervals(tenant.id, tenant.googleCalendarId, dayStartUtc.toJSDate(), dayEndUtc.toJSDate())
     : [];
 
   const now = DateTime.now().setZone(zone);
@@ -82,13 +82,13 @@ export async function checkAvailability(
   let cursor = localDate.set({ hour: rangeStart.hour, minute: rangeStart.minute, second: 0, millisecond: 0 });
   const end = localDate.set({ hour: rangeEnd.hour, minute: rangeEnd.minute, second: 0, millisecond: 0 });
 
-  while (cursor.plus({ minutes: SLOT_DURATION_MINUTES }) <= end) {
+  while (cursor.plus({ minutes: slotDurationMinutes }) <= end) {
     const slotStart = cursor;
-    const slotEnd = cursor.plus({ minutes: SLOT_DURATION_MINUTES });
+    const slotEnd = cursor.plus({ minutes: slotDurationMinutes });
 
     const isPast = slotStart < now;
-    const overlapsExisting = existingAppointments.some(
-      (appt) => slotStart.toJSDate() < appt.endAt && slotEnd.toJSDate() > appt.startAt,
+    const overlapsExisting = existingBookings.some(
+      (booking) => slotStart.toJSDate() < booking.endAt && slotEnd.toJSDate() > booking.startAt,
     );
     const overlapsCalendarBusy = calendarBusyIntervals.some(
       (busy) => slotStart.toJSDate() < busy.end && slotEnd.toJSDate() > busy.start,
@@ -102,7 +102,7 @@ export async function checkAvailability(
       });
     }
 
-    cursor = cursor.plus({ minutes: SLOT_DURATION_MINUTES });
+    cursor = cursor.plus({ minutes: slotDurationMinutes });
   }
 
   return slots;

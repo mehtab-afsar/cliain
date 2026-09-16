@@ -5,8 +5,8 @@ import { env } from "@/lib/env";
 
 /** OAuth2Client mints a fresh access token from the stored refresh token on demand — no
  *  manual token-refresh logic needed here, same as the old JWT client self-minted per request. */
-export async function getCalendarClient(doctorId: string) {
-  const refreshToken = await getGoogleCalendarRefreshToken(doctorId);
+export async function getCalendarClient(tenantId: string) {
+  const refreshToken = await getGoogleCalendarRefreshToken(tenantId);
   if (!refreshToken || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
 
   const auth = new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
@@ -19,13 +19,13 @@ export type CalendarSyncResult =
   | { ok: false; error: string };
 
 type EventDetails = {
-  doctorId: string;
+  tenantId: string;
   calendarId: string;
-  // Tagged onto the Calendar event as extendedProperties.private.appointmentId, so a later
+  // Tagged onto the Calendar event as extendedProperties.private.bookingId, so a later
   // incremental sync (calendar-watch-service.ts) can reliably match an externally-edited
-  // event back to the Appointment row that created it, without relying on googleCalendarEventId
+  // event back to the Booking row that created it, without relying on googleCalendarEventId
   // alone (which can't be looked up efficiently from an events.list page).
-  appointmentId: string;
+  bookingId: string;
   summary: string;
   description?: string;
   startAt: Date;
@@ -36,7 +36,7 @@ type EventDetails = {
 /** Best-effort: Postgres is the source of truth, Calendar is a one-way mirror. Never throws. */
 export async function createCalendarEvent(details: EventDetails): Promise<CalendarSyncResult> {
   try {
-    const calendar = await getCalendarClient(details.doctorId);
+    const calendar = await getCalendarClient(details.tenantId);
     if (!calendar) return { ok: false, error: "Google Calendar is not configured." };
 
     const response = await calendar.events.insert({
@@ -46,7 +46,7 @@ export async function createCalendarEvent(details: EventDetails): Promise<Calend
         description: details.description,
         start: { dateTime: details.startAt.toISOString(), timeZone: details.timezone },
         end: { dateTime: details.endAt.toISOString(), timeZone: details.timezone },
-        extendedProperties: { private: { appointmentId: details.appointmentId } },
+        extendedProperties: { private: { bookingId: details.bookingId } },
       },
     });
     const eventId = response.data.id;
@@ -58,13 +58,13 @@ export async function createCalendarEvent(details: EventDetails): Promise<Calend
 }
 
 export async function updateCalendarEvent(
-  doctorId: string,
+  tenantId: string,
   calendarId: string,
   eventId: string,
   patch: { startAt: Date; endAt: Date; timezone: string },
 ): Promise<CalendarSyncResult> {
   try {
-    const calendar = await getCalendarClient(doctorId);
+    const calendar = await getCalendarClient(tenantId);
     if (!calendar) return { ok: false, error: "Google Calendar is not configured." };
 
     await calendar.events.patch({
@@ -82,12 +82,12 @@ export async function updateCalendarEvent(
 }
 
 export async function deleteCalendarEvent(
-  doctorId: string,
+  tenantId: string,
   calendarId: string,
   eventId: string,
 ): Promise<CalendarSyncResult> {
   try {
-    const calendar = await getCalendarClient(doctorId);
+    const calendar = await getCalendarClient(tenantId);
     if (!calendar) return { ok: false, error: "Google Calendar is not configured." };
 
     await calendar.events.delete({ calendarId, eventId });
@@ -109,13 +109,13 @@ export type BusyInterval = { start: Date; end: Date };
  * only means this read-back is skipped for that check (the existing Postgres check still runs).
  */
 export async function getBusyIntervals(
-  doctorId: string,
+  tenantId: string,
   calendarId: string,
   windowStart: Date,
   windowEnd: Date,
 ): Promise<BusyInterval[]> {
   try {
-    const calendar = await getCalendarClient(doctorId);
+    const calendar = await getCalendarClient(tenantId);
     if (!calendar) return [];
 
     const { data } = await calendar.freebusy.query({
@@ -131,7 +131,7 @@ export async function getBusyIntervals(
       .filter((block) => block.start && block.end)
       .map((block) => ({ start: new Date(block.start!), end: new Date(block.end!) }));
   } catch (error) {
-    console.error(`[calendar-sync] freebusy query failed for doctor ${doctorId}:`, error);
+    console.error(`[calendar-sync] freebusy query failed for tenant ${tenantId}:`, error);
     return [];
   }
 }

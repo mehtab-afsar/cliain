@@ -18,15 +18,15 @@ export const cancelAppointmentTool: ToolDefinition<CancelAppointmentInput> = {
     required: ["appointmentId"],
   },
   async execute(input, context) {
-    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
+    const patient = await getPatientByPhone(context.tenantId, context.patientPhone);
     if (!patient) return { error: "No patient record found for this number." };
 
-    const appointment = await db.appointment.findUnique({ where: { id: input.appointmentId } });
-    if (!appointment || appointment.patientId !== patient.id) {
+    const appointment = await db.booking.findUnique({ where: { id: input.appointmentId } });
+    if (!appointment || appointment.customerId !== patient.id) {
       return { error: "That appointment doesn't belong to this patient." };
     }
 
-    const cancelled = await cancelAppointment(context.doctorId, input.appointmentId, {
+    const cancelled = await cancelAppointment(context.tenantId, input.appointmentId, {
       actor: "ai",
       channel: context.channel,
     });

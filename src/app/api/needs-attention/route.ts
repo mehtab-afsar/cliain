@@ -17,7 +17,7 @@ export async function GET() {
         .slice()
         .reverse()
         .map((message) => ({ role: message.role, content: message.content })),
-      upcomingAppointmentId: patient.appointments[0]?.id ?? null,
+      upcomingAppointmentId: patient.bookings[0]?.id ?? null,
     })),
   });
 }

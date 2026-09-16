@@ -27,10 +27,10 @@ export const escalateTool: ToolDefinition<EscalateInput> = {
     required: ["reason"],
   },
   async execute(input, context) {
-    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
+    const patient = await getPatientByPhone(context.tenantId, context.patientPhone);
     if (!patient) return { ok: false, error: "No patient record to escalate." };
 
-    await db.patient.update({
+    await db.customer.update({
       where: { id: patient.id },
       data: {
         needsHumanReview: true,
@@ -39,12 +39,12 @@ export const escalateTool: ToolDefinition<EscalateInput> = {
       },
     });
 
-    const settings = await resolveSettings(context.doctorId);
+    const settings = await resolveSettings(context.tenantId);
     if (settings.safety.escalationWhatsappNumber) {
       // Never lets a missing/unapproved staff-alert template break the handoff itself — the
       // patient-side needsHumanReview flag above is what actually matters and is already set.
       await sendWhatsappTemplate(
-        context.doctorId,
+        context.tenantId,
         settings.safety.escalationWhatsappNumber,
         "staff_escalation_alert",
         "en_US",

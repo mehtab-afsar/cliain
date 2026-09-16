@@ -25,19 +25,19 @@ model Membership {
   id        String         @id @default(cuid())
   userId    String
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  doctorId  String
-  doctor    Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   role      MembershipRole
   createdAt DateTime       @default(now())
 
-  @@unique([userId, doctorId])
-  @@index([doctorId])
+  @@unique([userId, tenantId])
+  @@index([tenantId])
 }
 
 model Invitation {
   id               String         @id @default(cuid())
-  doctorId         String
-  doctor           Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   token            String         @unique
   role             MembershipRole @default(staff)
   createdByUserId  String
@@ -46,18 +46,29 @@ model Invitation {
   acceptedByUserId String?
   createdAt        DateTime       @default(now())
 
-  @@index([doctorId])
+  @@index([tenantId])
 }
 
-model Doctor {
-  id            String         @id @default(cuid())
-  clinicName    String?
-  name          String
-  // Split out of `name` so the AI never says "Dr. Dr. Mehtab" — see ClinicSettings'
-  // `doctors[].title`, which is the field actually read going forward. This column stays
-  // for now as the legacy source `name` was always typed into (e.g. "Dr. Alex Rivera").
-  title         String?
-  specialty     String?
+// The tenant row — one per business account. Cliain 1.0 called this "Doctor" and modeled one
+// clinic as one bookable person; generalized so a tenant can hold multiple locations and
+// resources (see Location/Resource) without another migration. `vertical`/`templateVersion`
+// select which template (see src/features/templates) supplies the AI's prompt content, safety
+// rules, and default booking fields — clinic-only content that used to live inline in
+// system-prompt.ts now lives in the "clinic-v1" template, and this row just points at it.
+// `overrides` is tenant-specific config layered on top of the template's defaults (see
+// config-resolver.ts) — validated against the template's own overridesSchema, not enforced by
+// Postgres, same pattern ClinicSettings already used for its JSON document.
+model Tenant {
+  id         String  @id @default(cuid())
+  clinicName String?
+  // Business market and hosting region — unset for existing dev tenants until onboarding
+  // (or a backfill) sets them; not yet read by any routing logic in this phase.
+  market       String?
+  regionCell   String?
+  vertical     String @default("clinic")
+  templateVersion String @default("clinic-v1")
+  plan         String @default("trial")
+  overrides    Json   @default("{}")
   whatsappPhone String?
   timezone      String         @default("UTC")
   // Defaults to "primary" the moment Google Calendar is connected (see the OAuth callback) —
@@ -65,9 +76,11 @@ model Doctor {
   // whichever Google account they connected. Also doubles as the "is Calendar sync on for
   // this booking" gate in appointment-service.ts.
   googleCalendarId String?
-  workingHours  WorkingHours[]
-  appointments  Appointment[]
-  patients      Patient[]
+  locations     Location[]
+  resources     Resource[]
+  offerings     Offering[]
+  bookings      Booking[]
+  customers     Customer[]
   memberships   Membership[]
   invitations   Invitation[]
   settings      ClinicSettings?
@@ -109,7 +122,7 @@ model Doctor {
   // Google Calendar push notifications (events.watch) — see calendar-watch-service.ts.
   // Channel/resource ids identify *this* watch registration so a renewal or stop can address
   // it; googleCalendarWatchChannelId is unique because the push-notification webhook route
-  // receives only a channel id (no doctorId) and must look up the owning doctor by it.
+  // receives only a channel id (no tenantId) and must look up the owning tenant by it.
   // googleCalendarSyncToken is Calendar's own cursor for incremental events.list reads,
   // rotated on every successful poll. googleCalendarWatchExpiresAt drives the renewal cron
   // (Google caps a channel at ~1 month) and googleCalendarWatchToken is compared against each
@@ -129,15 +142,70 @@ model Doctor {
   escalationWhatsappNumber String?
 }
 
-// One versioned JSON document per clinic — the AI system prompt renders from this at request
+// A branch. Every Cliain 1.0 tenant implicitly had exactly one (the clinic itself) — this
+// model exists so a future multi-location tenant doesn't need another migration. Backfilled
+// one-per-tenant; not yet surfaced in onboarding or settings UI.
+model Location {
+  id        String     @id @default(cuid())
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String?
+  timezone  String
+  address   String?
+  isPrimary Boolean    @default(true)
+  resources Resource[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+// Anything bookable: a doctor, a trainer, a table. Generalizes what Cliain 1.0 modeled as
+// attributes directly on Doctor (name/title/specialty) — those fields moved here so a tenant
+// can eventually have more than one. `type` is a free-form template-defined string (e.g.
+// "practitioner" for clinic-v1) rather than a Postgres enum, validated at the application
+// boundary by the template registry instead. `attributes` carries vertical-specific fields
+// (specialty, gender, section, etc.) that don't deserve their own column.
+model Resource {
+  id           String         @id @default(cuid())
+  tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId   String
+  location     Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  type         String
+  name         String
+  title        String?
+  attributes   Json           @default("{}")
+  workingHours WorkingHours[]
+  bookings     Booking[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+// What customers book: a consultation, a class, a table. clinic-v1 only ever defines one
+// ("Consultation") per tenant today, but this replaces the hardcoded SLOT_DURATION_MINUTES
+// constant in availability-service.ts with a real per-tenant, per-offering value.
+model Offering {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  durationMinutes Int
+  resourceType    String
+  fields          Json      @default("{}")
+  active          Boolean   @default(true)
+  bookings        Booking[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// One versioned JSON document per tenant — the AI system prompt renders from this at request
 // time (see resolveSettings() in settings-repository.ts), so changing a setting never needs a
 // deploy. `data`'s shape is validated against the Zod schema in features/settings/schema.ts,
 // not enforced by Postgres — schemaVersion exists so a future shape change can migrate old
 // documents forward instead of silently misreading them.
 model ClinicSettings {
   id            String   @id @default(cuid())
-  doctorId      String   @unique
-  doctor        Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   schemaVersion Int      @default(1)
   data          Json
   updatedAt     DateTime @updatedAt
@@ -147,41 +215,48 @@ model ClinicSettings {
 // bottom of each Settings tab.
 model SettingsAudit {
   id       String   @id @default(cuid())
-  doctorId String
-  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   field    String
   oldValue Json?
   newValue Json?
   actor    String
   at       DateTime @default(now())
 
-  @@index([doctorId, at(sort: Desc)])
+  @@index([tenantId, at(sort: Desc)])
 }
 
 model WorkingHours {
-  id        String  @id @default(cuid())
-  doctorId  String
-  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  dayOfWeek Int // 0 = Sunday .. 6 = Saturday
-  isOpen    Boolean @default(true)
-  startTime String // "09:00"
-  endTime   String // "17:00"
+  id         String   @id @default(cuid())
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int // 0 = Sunday .. 6 = Saturday
+  isOpen     Boolean  @default(true)
+  startTime  String // "09:00"
+  endTime    String // "17:00"
 
-  @@unique([doctorId, dayOfWeek])
+  @@unique([resourceId, dayOfWeek])
 }
 
-model Patient {
+model Customer {
   id            String         @id @default(cuid())
-  doctorId      String
-  doctor        Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name          String?
+  // Formalized as E.164 at the write boundary (see patient-service.ts) — already
+  // WhatsApp-sourced in practice, just not validated before this phase.
   phone         String
+  language      String?
+  tags          String[]       @default([])
+  fields        Json           @default("{}")
   createdAt     DateTime       @default(now())
-  appointments  Appointment[]
+  bookings      Booking[]
   conversations Conversation[]
 
-  // Set the first time the AI's disclosure line is sent (WhatsApp) — see agent-loop.ts.
-  consentGivenAt DateTime?
+  // Marketing/consent flags — replaces the single-purpose consentGivenAt (set the first time
+  // the AI's disclosure line is sent on WhatsApp; see agent-loop.ts). Shape:
+  // { whatsappDisclosure?: { grantedAt: string } }.
+  consents Json @default("{}")
 
   // Set by the "escalate" tool (emergency, explicit human request, or the AI giving up after
   // ~2 attempts). While true, the AI does not reply — see runTool() in tools/index.ts and the
@@ -190,10 +265,10 @@ model Patient {
   needsHumanReviewReason String?
   needsHumanReviewAt     DateTime?
 
-  @@unique([doctorId, phone])
+  @@unique([tenantId, phone])
 }
 
-enum AppointmentStatus {
+enum BookingStatus {
   booked
   arrived
   in_progress
@@ -203,65 +278,109 @@ enum AppointmentStatus {
   rescheduled
 }
 
-model Appointment {
-  id                      String             @id @default(cuid())
-  doctorId                String
-  doctor                  Doctor             @relation(fields: [doctorId], references: [id])
-  patientId               String
-  patient                 Patient            @relation(fields: [patientId], references: [id])
+enum BookingMode {
+  appointment
+  class
+  reservation
+  request
+}
+
+model Booking {
+  id                      String        @id @default(cuid())
+  tenantId                String
+  tenant                  Tenant        @relation(fields: [tenantId], references: [id])
+  customerId              String
+  customer                Customer      @relation(fields: [customerId], references: [id])
+  resourceId              String
+  resource                Resource      @relation(fields: [resourceId], references: [id])
+  offeringId              String
+  offering                Offering      @relation(fields: [offeringId], references: [id])
+  mode                    BookingMode   @default(appointment)
+  partySize               Int           @default(1)
+  sourceChannel           String?
+  fields                  Json          @default("{}")
   startAt                 DateTime
   endAt                   DateTime
-  status                  AppointmentStatus  @default(booked)
+  status                  BookingStatus @default(booked)
   // Free-text reason for the *current* status (cancellation reason, "auto: end of day", etc.)
-  // — the full transition history lives in AppointmentEvent, this is just the latest one for
+  // — the full transition history lives in BookingEvent, this is just the latest one for
   // fast list/detail reads without a join.
   statusReason            String?
   reason                  String?
   // Set on the new row a reschedule creates; the old row is frozen at status "rescheduled"
   // rather than mutated in place, so both the original and the new time stay on record.
-  rescheduledFromId       String?            @unique
-  rescheduledFrom         Appointment?       @relation("AppointmentReschedule", fields: [rescheduledFromId], references: [id])
-  rescheduledTo           Appointment?       @relation("AppointmentReschedule")
+  rescheduledFromId       String?    @unique
+  rescheduledFrom         Booking?   @relation("BookingReschedule", fields: [rescheduledFromId], references: [id])
+  rescheduledTo           Booking?   @relation("BookingReschedule")
   completedAt             DateTime?
   completedBy             String?
   googleCalendarEventId   String?
   googleCalendarSyncError String?
   reminder24hSentAt       DateTime?
   reminder2hSentAt        DateTime?
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
-  events                  AppointmentEvent[]
+  // Idempotency for tool-call retries (e.g. a replayed WhatsApp webhook) — derived from the
+  // model's tool_use id so the same intended write can't create two bookings. Postgres allows
+  // multiple NULLs in a unique index, so bookings created before this existed (or via paths
+  // that don't pass one) never spuriously conflict with each other.
+  idempotencyKey          String?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  events                  BookingEvent[]
 
-  @@index([doctorId, startAt])
-  @@index([patientId])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, startAt])
+  @@index([resourceId, startAt])
+  @@index([customerId])
 }
 
 // One row per status transition — an audit trail, not just the latest state. Written inside
 // the same transaction as the status change it records, so there's no transition without a
 // matching event.
-model AppointmentEvent {
-  id            String             @id @default(cuid())
-  appointmentId String
-  appointment   Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  doctorId      String
-  at            DateTime           @default(now())
-  fromStatus    AppointmentStatus?
-  toStatus      AppointmentStatus
-  actor         String // 'ai' | 'scheduler' | 'staff:<userId>'
-  channel       String? // 'whatsapp' | 'voice' | 'dashboard' | null
-  reason        String?
+model BookingEvent {
+  id         String         @id @default(cuid())
+  bookingId  String
+  booking    Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  tenantId   String
+  at         DateTime       @default(now())
+  fromStatus BookingStatus?
+  toStatus   BookingStatus
+  actor      String // 'ai' | 'scheduler' | 'staff:<userId>'
+  channel    String? // 'whatsapp' | 'voice' | 'dashboard' | null
+  reason     String?
 
-  @@index([doctorId, at(sort: Desc)])
+  @@index([tenantId, at(sort: Desc)])
 }
 
 model Conversation {
-  id        String   @id @default(cuid())
-  patientId String
-  patient   Patient  @relation(fields: [patientId], references: [id])
-  role      String // "user" | "assistant"
-  content   String   @db.Text
-  wamid     String?  @unique
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  role       String // "user" | "assistant"
+  content    String   @db.Text
+  wamid      String?  @unique
+  createdAt  DateTime @default(now())
 
-  @@index([patientId, createdAt])
+  @@index([customerId, createdAt])
+}
+
+// The usage/billing ledger — one row per billable unit (an LLM call today; WhatsApp messages,
+// voice minutes, STT/TTS seconds in later phases). Populated by the model router
+// (src/lib/model-router) from each provider's own usage response plus a static price table.
+// No real billing integration reads this yet in this phase — it exists so the shape and the
+// write path are in place before usage needs to be metered for real.
+model UsageEvent {
+  id             BigInt   @id @default(autoincrement())
+  tenantId       String
+  kind           String // 'llm_call', later: 'wa_msg_utility', 'voice_min_cascaded', etc.
+  provider       String?
+  model          String?
+  inputTokens    Int?
+  outputTokens   Int?
+  costUsdMicros  BigInt?
+  channel        String?
+  conversationId String?
+  bookingId      String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, createdAt])
 }

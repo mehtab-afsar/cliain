@@ -79,7 +79,7 @@ export async function provisionVapiForDoctor(doctorId: string, clinicName: strin
       return { ok: false, error: lastError };
     }
 
-    await db.doctor.update({
+    await db.tenant.update({
       where: { id: doctorId },
       data: {
         vapiPhoneNumberId: data.id,
@@ -100,7 +100,7 @@ export async function provisionVapiForDoctor(doctorId: string, clinicName: strin
 /** Best-effort — clears this clinic's own record even if Vapi's API call fails, so a clinic
  *  disabling phone calls is never stuck "connected" to a number Cliain can no longer manage. */
 export async function deprovisionVapiForDoctor(doctorId: string): Promise<void> {
-  const doctor = await db.doctor.findUnique({
+  const doctor = await db.tenant.findUnique({
     where: { id: doctorId },
     select: { vapiPhoneNumberId: true },
   });
@@ -116,7 +116,7 @@ export async function deprovisionVapiForDoctor(doctorId: string): Promise<void> 
     }
   }
 
-  await db.doctor.update({
+  await db.tenant.update({
     where: { id: doctorId },
     data: { vapiPhoneNumberId: null, vapiPhoneNumber: null, vapiWebhookSecret: null },
   });

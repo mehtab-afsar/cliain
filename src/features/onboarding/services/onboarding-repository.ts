@@ -1,23 +1,30 @@
 import "server-only";
 import { db } from "@/lib/db";
-import type { Doctor, WorkingHours } from "@prisma/client";
+import type { Tenant, Resource, WorkingHours } from "@prisma/client";
 import type { OnboardingDraft } from "../types";
 import { WEEKDAY_LABELS } from "../types";
 
-type DoctorWithHours = Doctor & { workingHours: WorkingHours[] };
+const DEFAULT_OFFERING_DURATION_MINUTES = 30;
 
-function mapDoctorToDraft(doctor: DoctorWithHours): OnboardingDraft {
-  const hoursByDay = new Map(doctor.workingHours.map((day) => [day.dayOfWeek, day]));
+type TenantWithPrimaryResource = Tenant & {
+  resources: Array<Resource & { workingHours: WorkingHours[] }>;
+};
+
+function mapTenantToDraft(tenant: TenantWithPrimaryResource): OnboardingDraft | null {
+  const resource = tenant.resources[0];
+  if (!resource) return null;
+  const attributes = (resource.attributes ?? {}) as { specialty?: string };
+  const hoursByDay = new Map(resource.workingHours.map((day) => [day.dayOfWeek, day]));
 
   return {
     clinicBasics: {
-      clinicName: doctor.clinicName ?? "",
-      timezone: doctor.timezone,
+      clinicName: tenant.clinicName ?? "",
+      timezone: tenant.timezone,
     },
     doctorProfile: {
-      doctorName: doctor.name,
-      specialty: doctor.specialty ?? "",
-      whatsappNumber: doctor.whatsappPhone ?? "",
+      doctorName: resource.name,
+      specialty: attributes.specialty ?? "",
+      whatsappNumber: tenant.whatsappPhone ?? "",
     },
     workingHours: WEEKDAY_LABELS.map((label, dayOfWeek) => {
       const existing = hoursByDay.get(dayOfWeek);
@@ -29,17 +36,17 @@ function mapDoctorToDraft(doctor: DoctorWithHours): OnboardingDraft {
         endTime: existing?.endTime ?? "17:00",
       };
     }),
-    completedAt: doctor.updatedAt.toISOString(),
+    completedAt: tenant.updatedAt.toISOString(),
   };
 }
 
-async function upsertWorkingHours(doctorId: string, draft: OnboardingDraft): Promise<void> {
+async function upsertWorkingHours(resourceId: string, draft: OnboardingDraft): Promise<void> {
   await Promise.all(
     draft.workingHours.map((day) =>
       db.workingHours.upsert({
-        where: { doctorId_dayOfWeek: { doctorId, dayOfWeek: day.dayOfWeek } },
+        where: { resourceId_dayOfWeek: { resourceId, dayOfWeek: day.dayOfWeek } },
         create: {
-          doctorId,
+          resourceId,
           dayOfWeek: day.dayOfWeek,
           isOpen: day.isOpen,
           startTime: day.startTime,
@@ -55,49 +62,85 @@ async function upsertWorkingHours(doctorId: string, draft: OnboardingDraft): Pro
   );
 }
 
-/** Reads an existing clinic's draft — used by the dashboard settings edit flow. */
-export async function getOnboardingDraft(doctorId: string): Promise<OnboardingDraft | null> {
-  const doctor = await db.doctor.findUnique({
-    where: { id: doctorId },
-    include: { workingHours: true },
+/** Reads an existing tenant's draft — used by the dashboard settings edit flow. */
+export async function getOnboardingDraft(tenantId: string): Promise<OnboardingDraft | null> {
+  const tenant = await db.tenant.findUnique({
+    where: { id: tenantId },
+    include: { resources: { include: { workingHours: true }, orderBy: { createdAt: "asc" }, take: 1 } },
   });
-  return doctor ? mapDoctorToDraft(doctor) : null;
+  return tenant ? mapTenantToDraft(tenant) : null;
 }
 
-function doctorDataFromDraft(draft: OnboardingDraft) {
+function tenantDataFromDraft(draft: OnboardingDraft) {
   return {
     clinicName: draft.clinicBasics.clinicName,
     timezone: draft.clinicBasics.timezone,
-    name: draft.doctorProfile.doctorName,
-    specialty: draft.doctorProfile.specialty || null,
     whatsappPhone: draft.doctorProfile.whatsappNumber || null,
   };
 }
 
-/** Always creates a brand-new clinic, owned by `userId` — the one-time "no membership yet" flow. */
+/** Always creates a brand-new tenant, owned by `userId` — the one-time "no membership yet" flow. */
 export async function createClinic(
   userId: string,
   draft: OnboardingDraft,
 ): Promise<{ draft: OnboardingDraft; doctorId: string }> {
-  const doctor = await db.$transaction(async (tx) => {
-    const created = await tx.doctor.create({ data: doctorDataFromDraft(draft) });
-    await tx.membership.create({ data: { userId, doctorId: created.id, role: "owner" } });
-    return created;
+  const resource = await db.$transaction(async (tx) => {
+    const tenant = await tx.tenant.create({ data: tenantDataFromDraft(draft) });
+    await tx.membership.create({ data: { userId, tenantId: tenant.id, role: "owner" } });
+
+    const location = await tx.location.create({
+      data: {
+        tenantId: tenant.id,
+        name: draft.clinicBasics.clinicName,
+        timezone: draft.clinicBasics.timezone,
+        isPrimary: true,
+      },
+    });
+
+    const createdResource = await tx.resource.create({
+      data: {
+        tenantId: tenant.id,
+        locationId: location.id,
+        type: "practitioner",
+        name: draft.doctorProfile.doctorName,
+        attributes: draft.doctorProfile.specialty ? { specialty: draft.doctorProfile.specialty } : {},
+      },
+    });
+
+    await tx.offering.create({
+      data: {
+        tenantId: tenant.id,
+        name: "Consultation",
+        durationMinutes: DEFAULT_OFFERING_DURATION_MINUTES,
+        resourceType: "practitioner",
+      },
+    });
+
+    return createdResource;
   });
 
-  await upsertWorkingHours(doctor.id, draft);
+  await upsertWorkingHours(resource.id, draft);
 
-  const saved = await getOnboardingDraft(doctor.id);
+  const saved = await getOnboardingDraft(resource.tenantId);
   if (!saved) throw new Error("Failed to reload onboarding draft after creating the clinic.");
-  return { draft: saved, doctorId: doctor.id };
+  return { draft: saved, doctorId: resource.tenantId };
 }
 
-/** Updates an existing clinic — the dashboard settings edit flow. */
-export async function updateClinic(doctorId: string, draft: OnboardingDraft): Promise<OnboardingDraft> {
-  await db.doctor.update({ where: { id: doctorId }, data: doctorDataFromDraft(draft) });
-  await upsertWorkingHours(doctorId, draft);
+/** Updates an existing tenant — the dashboard settings edit flow. */
+export async function updateClinic(tenantId: string, draft: OnboardingDraft): Promise<OnboardingDraft> {
+  const resource = await db.resource.findFirstOrThrow({ where: { tenantId }, orderBy: { createdAt: "asc" } });
 
-  const saved = await getOnboardingDraft(doctorId);
+  await db.tenant.update({ where: { id: tenantId }, data: tenantDataFromDraft(draft) });
+  await db.resource.update({
+    where: { id: resource.id },
+    data: {
+      name: draft.doctorProfile.doctorName,
+      attributes: draft.doctorProfile.specialty ? { specialty: draft.doctorProfile.specialty } : {},
+    },
+  });
+  await upsertWorkingHours(resource.id, draft);
+
+  const saved = await getOnboardingDraft(tenantId);
   if (!saved) throw new Error("Failed to reload onboarding draft after updating the clinic.");
   return saved;
 }

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { runTool } from "@/features/ai-agent/services/tools";
 import { buildInboundAssistantConfig } from "@/features/ai-agent/services/vapi-client";
-import { getDoctorById } from "@/features/appointments/services/doctor-repository";
-import { resolveSettings } from "@/features/settings/services/settings-repository";
+import { getTenantById } from "@/features/appointments/services/doctor-repository";
+import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
+import type { ClinicSettingsData } from "@/features/settings/schema";
 import { getVapiWebhookSecret } from "@/lib/integration-credentials";
+import { mintToolToken } from "@/features/ai-agent/services/tool-token";
 import { vapiPublicUrl } from "@/lib/env";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { verifyVapiSecret } from "@/lib/webhook-signatures";
@@ -67,13 +69,16 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   let doctor;
   try {
-    doctor = await getDoctorById(doctorId);
+    doctor = await getTenantById(doctorId);
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }
 
   // A webhook secret is required to connect Vapi at all (see saveIntegrationCredentials), so
-  // this only stays unverified for clinics that connected before that requirement existed.
+  // this only stays unverified for clinics that connected before that requirement existed —
+  // same pre-existing gap as the WhatsApp route, not something introduced by the Tool Gateway
+  // below: a tenant with no webhookSecret configured yet still gets a token minted from the
+  // path's doctorId alone, exactly as lenient as this route already was.
   const webhookSecret = await getVapiWebhookSecret(doctorId);
   if (webhookSecret) {
     const secretHeader = request.headers.get("x-vapi-secret");
@@ -81,6 +86,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       return new NextResponse("Invalid secret", { status: 401 });
     }
   }
+
+  // Every tool call this request makes derives its tenant from this token, never from the
+  // path segment again (see tool-token.ts).
+  const toolToken = mintToolToken({ tenantId: doctorId, channel: "voice" });
 
   let payload: VapiWebhookPayload;
   try {
@@ -104,8 +113,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       if (!publicUrl) {
         return NextResponse.json({ error: "No URL Vapi can reach is configured." }, { status: 500 });
       }
-      const settings = await resolveSettings(doctorId);
+      const { template, settings: rawSettings } = await resolveTenantConfig(doctorId);
+      const settings = rawSettings as ClinicSettingsData;
       const assistant = buildInboundAssistantConfig(
+        template,
         doctor,
         settings,
         `${publicUrl}/api/webhooks/vapi/${doctorId}`,
@@ -134,7 +145,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       toolCalls.map(async (call) => {
         try {
           const result = await withTimeout(
-            runTool(call.name, call.arguments, { patientPhone, doctorId, channel: "voice" }),
+            runTool(call.name, call.arguments, toolToken, patientPhone),
             TOOL_CALL_TIMEOUT_MS,
           );
           return { toolCallId: call.id, result: JSON.stringify(result) };

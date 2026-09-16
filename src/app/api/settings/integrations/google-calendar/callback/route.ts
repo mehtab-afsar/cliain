@@ -38,10 +38,10 @@ export async function GET(request: Request) {
 
   try {
     const { refreshToken, email } = await completeGoogleCalendarConnection(code);
-    const current = await db.doctor.findUnique({ where: { id: doctorId }, select: { googleCalendarId: true } });
+    const current = await db.tenant.findUnique({ where: { id: doctorId }, select: { googleCalendarId: true } });
     const calendarId = current?.googleCalendarId ?? "primary";
 
-    await db.doctor.update({
+    await db.tenant.update({
       where: { id: doctorId },
       data: {
         googleCalendarRefreshToken: encryptSecret(refreshToken),

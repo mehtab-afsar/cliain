@@ -29,25 +29,51 @@ async function main() {
 
   const membership = await db.membership.findFirst({ where: { userId: user.id } });
   if (!membership) throw new Error("No membership for the beta account — run onboarding once first.");
-  const doctorId = membership.doctorId;
+  const doctorId = membership.tenantId;
 
-  await db.doctor.update({
+  await db.tenant.update({
     where: { id: doctorId },
     data: {
       clinicName: "Sunrise Family Clinic",
-      name: "Dr. Ananya Rao",
-      specialty: "General Physician",
       timezone: ZONE,
       whatsappPhone: "+918047182200",
       escalationWhatsappNumber: "+919845012233",
     },
   });
 
+  let location = await db.location.findFirst({ where: { tenantId: doctorId } });
+  if (!location) {
+    location = await db.location.create({
+      data: { tenantId: doctorId, name: "Sunrise Family Clinic", timezone: ZONE, isPrimary: true },
+    });
+  } else {
+    location = await db.location.update({ where: { id: location.id }, data: { timezone: ZONE } });
+  }
+
+  const resourceData = {
+    name: "Dr. Ananya Rao",
+    title: "Dr.",
+    attributes: { specialty: "General Physician" },
+  };
+  let resource = await db.resource.findFirst({ where: { tenantId: doctorId } });
+  resource = resource
+    ? await db.resource.update({ where: { id: resource.id }, data: resourceData })
+    : await db.resource.create({
+        data: { tenantId: doctorId, locationId: location.id, type: "practitioner", ...resourceData },
+      });
+
+  let offering = await db.offering.findFirst({ where: { tenantId: doctorId } });
+  if (!offering) {
+    offering = await db.offering.create({
+      data: { tenantId: doctorId, name: "Consultation", durationMinutes: 30, resourceType: "practitioner" },
+    });
+  }
+
   // Fresh slate for the demo tenant only.
-  await db.appointmentEvent.deleteMany({ where: { doctorId } });
-  await db.appointment.deleteMany({ where: { doctorId } });
-  await db.conversation.deleteMany({ where: { patient: { doctorId } } });
-  await db.patient.deleteMany({ where: { doctorId } });
+  await db.bookingEvent.deleteMany({ where: { tenantId: doctorId } });
+  await db.booking.deleteMany({ where: { tenantId: doctorId } });
+  await db.conversation.deleteMany({ where: { customer: { tenantId: doctorId } } });
+  await db.customer.deleteMany({ where: { tenantId: doctorId } });
 
   const hours = [
     { dayOfWeek: 0, isOpen: false, startTime: "09:00", endTime: "13:00" },
@@ -60,8 +86,8 @@ async function main() {
   ];
   for (const h of hours) {
     await db.workingHours.upsert({
-      where: { doctorId_dayOfWeek: { doctorId, dayOfWeek: h.dayOfWeek } },
-      create: { doctorId, ...h },
+      where: { resourceId_dayOfWeek: { resourceId: resource.id, dayOfWeek: h.dayOfWeek } },
+      create: { resourceId: resource.id, ...h },
       update: h,
     });
   }
@@ -85,12 +111,12 @@ async function main() {
 
   const patients: Record<string, string> = {};
   for (const [name, phone] of people) {
-    const p = await db.patient.create({
+    const p = await db.customer.create({
       data: {
-        doctorId,
+        tenantId: doctorId,
         name,
         phone,
-        consentGivenAt: DateTime.now().minus({ days: 20 }).toJSDate(),
+        consents: { whatsappDisclosure: { grantedAt: DateTime.now().minus({ days: 20 }).toISO() } },
       },
     });
     patients[name] = p.id;
@@ -141,10 +167,12 @@ async function main() {
   for (const row of rows) {
     const { startAt, endAt } = at(row.day, row.time, row.mins ?? 30);
     const createdAt = DateTime.fromJSDate(startAt).minus({ days: 2, hours: 3 }).toJSDate();
-    const appt = await db.appointment.create({
+    const appt = await db.booking.create({
       data: {
-        doctorId,
-        patientId: patients[row.who],
+        tenantId: doctorId,
+        customerId: patients[row.who],
+        resourceId: resource.id,
+        offeringId: offering.id,
         startAt,
         endAt,
         status: row.status,
@@ -173,10 +201,10 @@ async function main() {
     }
 
     for (const step of trail) {
-      await db.appointmentEvent.create({
+      await db.bookingEvent.create({
         data: {
-          appointmentId: appt.id,
-          doctorId,
+          bookingId: appt.id,
+          tenantId: doctorId,
           at: DateTime.fromJSDate(startAt).plus({ minutes: step.minutes }).toJSDate(),
           fromStatus: step.from,
           toStatus: step.to,
@@ -255,7 +283,7 @@ async function main() {
     for (const [role, content] of msgs) {
       await db.conversation.create({
         data: {
-          patientId: patients[name],
+          customerId: patients[name],
           role,
           content,
           createdAt: DateTime.now().minus({ days: 1, minutes: offset }).toJSDate(),
@@ -266,7 +294,7 @@ async function main() {
   }
 
   // Handoffs waiting on a human.
-  await db.patient.update({
+  await db.customer.update({
     where: { id: patients["Imran Qureshi"] },
     data: {
       needsHumanReview: true,
@@ -274,7 +302,7 @@ async function main() {
       needsHumanReviewAt: DateTime.now().minus({ hours: 2, minutes: 12 }).toJSDate(),
     },
   });
-  await db.patient.update({
+  await db.customer.update({
     where: { id: patients["Joseph Thomas"] },
     data: {
       needsHumanReview: true,
@@ -284,9 +312,9 @@ async function main() {
   });
 
   const counts = {
-    patients: await db.patient.count({ where: { doctorId } }),
-    appointments: await db.appointment.count({ where: { doctorId } }),
-    events: await db.appointmentEvent.count({ where: { doctorId } }),
+    patients: await db.customer.count({ where: { tenantId: doctorId } }),
+    appointments: await db.booking.count({ where: { tenantId: doctorId } }),
+    events: await db.bookingEvent.count({ where: { tenantId: doctorId } }),
   };
   console.log("doctorId:", doctorId);
   console.log("detail appointment:", detailId);

@@ -5,9 +5,9 @@ const MAX_HISTORY_MESSAGES = 20;
 
 export type StoredMessage = { role: "user" | "assistant"; content: string };
 
-export async function loadConversationHistory(patientId: string): Promise<StoredMessage[]> {
+export async function loadConversationHistory(customerId: string): Promise<StoredMessage[]> {
   const rows = await db.conversation.findMany({
-    where: { patientId },
+    where: { customerId },
     orderBy: { createdAt: "desc" },
     take: MAX_HISTORY_MESSAGES,
   });
@@ -18,12 +18,12 @@ export async function loadConversationHistory(patientId: string): Promise<Stored
 }
 
 export async function appendMessage(
-  patientId: string,
+  customerId: string,
   message: StoredMessage,
   wamid?: string,
 ): Promise<void> {
   await db.conversation.create({
-    data: { patientId, role: message.role, content: message.content, wamid },
+    data: { customerId, role: message.role, content: message.content, wamid },
   });
 }
 

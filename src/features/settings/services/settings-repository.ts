@@ -1,73 +1,19 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
 import { ClinicSettingsSchema, type ClinicSettingsData } from "../schema";
 
-function buildFallback(doctor: {
-  clinicName: string | null;
-  name: string;
-  title: string | null;
-  specialty: string | null;
-  whatsappPhone: string | null;
-  emergencyScript: string | null;
-  escalationWhatsappNumber: string | null;
-}): ClinicSettingsData {
-  return {
-    clinic: {
-      name: doctor.clinicName ?? doctor.name,
-      displayName: undefined,
-      address: undefined,
-      languages: ["English"],
-      phoneShownToPatients: doctor.whatsappPhone ?? undefined,
-    },
-    doctors: [
-      {
-        title: doctor.title === "Dr." || doctor.title === "Mr." || doctor.title === "Ms." || doctor.title === "none"
-          ? doctor.title
-          : "Dr.",
-        name: doctor.name,
-        specialty: doctor.specialty ?? undefined,
-      },
-    ],
-    safety: {
-      emergencyScript: doctor.emergencyScript ?? undefined,
-      escalationWhatsappNumber: doctor.escalationWhatsappNumber ?? undefined,
-    },
-    messaging: {
-      greeting: undefined,
-      tone: "friendly",
-      disclosureEnabled: true,
-    },
-  };
-}
-
-/** Shallow per-section merge — stored values win, missing sections/fields fall back. Doctors
- * only falls back wholesale (not merged) since array-of-object merging by index is fragile
- * and this phase only ever has one entry anyway. */
-function mergeSettings(
-  fallback: ClinicSettingsData,
-  stored: Partial<ClinicSettingsData> | undefined,
-): ClinicSettingsData {
-  if (!stored) return fallback;
-  return {
-    clinic: { ...fallback.clinic, ...stored.clinic },
-    doctors: stored.doctors && stored.doctors.length > 0 ? stored.doctors : fallback.doctors,
-    safety: { ...fallback.safety, ...stored.safety },
-    messaging: { ...fallback.messaging, ...stored.messaging },
-  };
-}
-
-/** The one function every settings-reading call site uses — never a raw Prisma row. */
-export async function resolveSettings(doctorId: string): Promise<ClinicSettingsData> {
-  const doctor = await db.doctor.findUniqueOrThrow({
-    where: { id: doctorId },
-    include: { settings: true },
-  });
-
-  const fallback = buildFallback(doctor);
-  const stored = doctor.settings?.data as Partial<ClinicSettingsData> | undefined;
-  const merged = mergeSettings(fallback, stored);
-  return ClinicSettingsSchema.parse(merged);
+/**
+ * The one function every settings-reading call site uses — never a raw Prisma row. A thin,
+ * stable-signature facade over the template-aware resolver (config-resolver.ts) so the many
+ * existing callers here don't need to change: every tenant is on clinic-v1 today, so this cast
+ * is exact, not a guess. A call site that also needs the resolved template (to build a system
+ * prompt, e.g.) calls resolveTenantConfig() directly instead.
+ */
+export async function resolveSettings(tenantId: string): Promise<ClinicSettingsData> {
+  const { settings } = await resolveTenantConfig(tenantId);
+  return settings as ClinicSettingsData;
 }
 
 function getPath(obj: unknown, path: string): unknown {
@@ -110,12 +56,12 @@ function titleCase(value: string): string {
  * in the same transaction, so there's never a setting change without an audit trail.
  */
 export async function updateSetting(
-  doctorId: string,
+  tenantId: string,
   field: string,
   value: unknown,
   actor: string,
 ): Promise<ClinicSettingsData> {
-  const current = await resolveSettings(doctorId);
+  const current = await resolveSettings(tenantId);
   const oldValue = getPath(current, field);
   const normalizedValue = isNameField(field) && typeof value === "string" ? titleCase(value) : value;
 
@@ -124,13 +70,13 @@ export async function updateSetting(
 
   await db.$transaction(async (tx) => {
     await tx.clinicSettings.upsert({
-      where: { doctorId },
-      create: { doctorId, data: parsed as unknown as Prisma.InputJsonValue, schemaVersion: 1 },
+      where: { tenantId },
+      create: { tenantId, data: parsed as unknown as Prisma.InputJsonValue, schemaVersion: 1 },
       update: { data: parsed as unknown as Prisma.InputJsonValue },
     });
     await tx.settingsAudit.create({
       data: {
-        doctorId,
+        tenantId,
         field,
         oldValue: (oldValue ?? null) as Prisma.InputJsonValue,
         newValue: (normalizedValue ?? null) as Prisma.InputJsonValue,
@@ -142,9 +88,9 @@ export async function updateSetting(
   return parsed;
 }
 
-export async function listRecentAudit(doctorId: string, fieldPrefix: string, limit = 20) {
+export async function listRecentAudit(tenantId: string, fieldPrefix: string, limit = 20) {
   return db.settingsAudit.findMany({
-    where: { doctorId, field: { startsWith: fieldPrefix } },
+    where: { tenantId, field: { startsWith: fieldPrefix } },
     orderBy: { at: "desc" },
     take: limit,
   });

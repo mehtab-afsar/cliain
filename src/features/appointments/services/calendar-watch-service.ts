@@ -8,14 +8,14 @@ import { getCalendarClient } from "./calendar-sync";
 import { cancelAppointment } from "./appointment-service";
 
 /**
- * Real-time mirror of the one-way write path in calendar-sync.ts: when a doctor edits or
- * deletes an appointment directly in their Google Calendar (not through the app), this keeps
+ * Real-time mirror of the one-way write path in calendar-sync.ts: when a tenant edits or
+ * deletes a booking directly in their Google Calendar (not through the app), this keeps
  * Postgres in sync via Google's push notifications (events.watch) — otherwise reminders and
- * the dashboard would keep showing a time the doctor already moved or a cancellation the
- * doctor already made on their own calendar.
+ * the dashboard would keep showing a time the tenant already moved or a cancellation the
+ * tenant already made on their own calendar.
  *
  * Everything here is best-effort: booking must never depend on live sync succeeding. A watch
- * that fails to register just means no real-time updates for that doctor until the next
+ * that fails to register just means no real-time updates for that tenant until the next
  * renewal pass — not a broken booking flow.
  */
 
@@ -28,8 +28,8 @@ function isGoogleGoneError(error: unknown): boolean {
 
 /** Establishes the incremental-sync cursor without acting on any existing events — the very
  *  first events.list call after a fresh watch just needs a nextSyncToken to read forward from. */
-async function bootstrapSyncToken(doctorId: string, calendarId: string): Promise<void> {
-  const calendar = await getCalendarClient(doctorId);
+async function bootstrapSyncToken(tenantId: string, calendarId: string): Promise<void> {
+  const calendar = await getCalendarClient(tenantId);
   if (!calendar) return;
 
   let pageToken: string | undefined;
@@ -45,14 +45,14 @@ async function bootstrapSyncToken(doctorId: string, calendarId: string): Promise
   } while (pageToken);
 
   if (syncToken) {
-    await db.doctor.update({ where: { id: doctorId }, data: { googleCalendarSyncToken: syncToken } });
+    await db.tenant.update({ where: { id: tenantId }, data: { googleCalendarSyncToken: syncToken } });
   }
 }
 
-/** Registers (or re-registers) a Calendar push-notification channel for this doctor. Silently
+/** Registers (or re-registers) a Calendar push-notification channel for this tenant. Silently
  *  no-ops if no publicly reachable webhook URL is configured (e.g. local dev without a tunnel)
  *  — that's a normal, expected state, not an error. */
-export async function startWatchingCalendar(doctorId: string, calendarId: string): Promise<void> {
+export async function startWatchingCalendar(tenantId: string, calendarId: string): Promise<void> {
   const publicUrl = calendarWebhookUrl();
   if (!publicUrl) return;
 
@@ -60,7 +60,7 @@ export async function startWatchingCalendar(doctorId: string, calendarId: string
   const token = randomBytes(24).toString("hex");
 
   try {
-    const calendar = await getCalendarClient(doctorId);
+    const calendar = await getCalendarClient(tenantId);
     if (!calendar) return;
 
     const { data } = await calendar.events.watch({
@@ -73,8 +73,8 @@ export async function startWatchingCalendar(doctorId: string, calendarId: string
       },
     });
 
-    await db.doctor.update({
-      where: { id: doctorId },
+    await db.tenant.update({
+      where: { id: tenantId },
       data: {
         googleCalendarWatchChannelId: channelId,
         googleCalendarWatchResourceId: data.resourceId ?? null,
@@ -83,34 +83,34 @@ export async function startWatchingCalendar(doctorId: string, calendarId: string
       },
     });
 
-    await bootstrapSyncToken(doctorId, calendarId);
+    await bootstrapSyncToken(tenantId, calendarId);
   } catch (error) {
-    console.error(`[calendar-watch] Failed to start watch for doctor ${doctorId}:`, error);
+    console.error(`[calendar-watch] Failed to start watch for tenant ${tenantId}:`, error);
   }
 }
 
-/** Tells Google to stop sending notifications for this doctor's current channel, and clears
+/** Tells Google to stop sending notifications for this tenant's current channel, and clears
  *  the stored channel/sync state. Safe to call even if no watch is currently registered. */
-export async function stopWatchingCalendar(doctorId: string): Promise<void> {
-  const doctor = await db.doctor.findUnique({ where: { id: doctorId } });
-  if (doctor?.googleCalendarWatchChannelId && doctor.googleCalendarWatchResourceId) {
+export async function stopWatchingCalendar(tenantId: string): Promise<void> {
+  const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
+  if (tenant?.googleCalendarWatchChannelId && tenant.googleCalendarWatchResourceId) {
     try {
-      const calendar = await getCalendarClient(doctorId);
+      const calendar = await getCalendarClient(tenantId);
       if (calendar) {
         await calendar.channels.stop({
           requestBody: {
-            id: doctor.googleCalendarWatchChannelId,
-            resourceId: doctor.googleCalendarWatchResourceId,
+            id: tenant.googleCalendarWatchChannelId,
+            resourceId: tenant.googleCalendarWatchResourceId,
           },
         });
       }
     } catch (error) {
-      console.error(`[calendar-watch] Failed to stop watch for doctor ${doctorId}:`, error);
+      console.error(`[calendar-watch] Failed to stop watch for tenant ${tenantId}:`, error);
     }
   }
 
-  await db.doctor.update({
-    where: { id: doctorId },
+  await db.tenant.update({
+    where: { id: tenantId },
     data: {
       googleCalendarWatchChannelId: null,
       googleCalendarWatchResourceId: null,
@@ -122,22 +122,22 @@ export async function stopWatchingCalendar(doctorId: string): Promise<void> {
 }
 
 /**
- * Reconciles one changed Calendar event back onto the Appointment it was tagged with at
- * creation time (extendedProperties.private.appointmentId — see createCalendarEvent). Events
- * with no such tag are the doctor's own unrelated calendar entries (e.g. lunch) and are
- * skipped; the freebusy read-back in availability-service.ts is what accounts for those.
+ * Reconciles one changed Calendar event back onto the Booking it was tagged with at creation
+ * time (extendedProperties.private.bookingId — see createCalendarEvent). Events with no such
+ * tag are the tenant's own unrelated calendar entries (e.g. lunch) and are skipped; the
+ * freebusy read-back in availability-service.ts is what accounts for those.
  */
-async function applyExternalCalendarChange(doctorId: string, event: calendar_v3.Schema$Event): Promise<void> {
-  const appointmentId = event.extendedProperties?.private?.appointmentId;
-  if (!appointmentId) return;
+async function applyExternalCalendarChange(tenantId: string, event: calendar_v3.Schema$Event): Promise<void> {
+  const bookingId = event.extendedProperties?.private?.bookingId;
+  if (!bookingId) return;
 
-  const appointment = await db.appointment.findFirst({ where: { id: appointmentId, doctorId } });
-  if (!appointment || appointment.status !== "booked") return;
+  const booking = await db.booking.findFirst({ where: { id: bookingId, tenantId } });
+  if (!booking || booking.status !== "booked") return;
 
   const by = { actor: "google-calendar-sync" };
 
   if (event.status === "cancelled") {
-    await cancelAppointment(doctorId, appointment.id, by, "Cancelled directly on Google Calendar", {
+    await cancelAppointment(tenantId, booking.id, by, "Cancelled directly on Google Calendar", {
       skipCalendarSync: true,
     });
     return;
@@ -146,38 +146,40 @@ async function applyExternalCalendarChange(doctorId: string, event: calendar_v3.
   const newStartAt = event.start?.dateTime ? new Date(event.start.dateTime) : null;
   const newEndAt = event.end?.dateTime ? new Date(event.end.dateTime) : null;
   if (!newStartAt || !newEndAt) return;
-  if (newStartAt.getTime() === appointment.startAt.getTime() && newEndAt.getTime() === appointment.endAt.getTime()) {
+  if (newStartAt.getTime() === booking.startAt.getTime() && newEndAt.getTime() === booking.endAt.getTime()) {
     return;
   }
 
   // A reconciliation job runs alone (nothing else is racing this particular write), so a plain
   // conflict check is enough — no need for writeIfSlotFree's Serializable transaction here.
-  const conflict = await db.appointment.findFirst({
+  // Scoped by resourceId, not tenantId, for the same reason as the transactional guard in
+  // appointment-service.ts: a tenant can have more than one bookable resource.
+  const conflict = await db.booking.findFirst({
     where: {
-      doctorId,
+      resourceId: booking.resourceId,
       status: "booked",
-      id: { not: appointment.id },
+      id: { not: booking.id },
       startAt: { lt: newEndAt },
       endAt: { gt: newStartAt },
     },
   });
 
   if (conflict) {
-    // Don't silently drop the doctor's calendar action, and don't silently overwrite another
+    // Don't silently drop the tenant's calendar action, and don't silently overwrite another
     // booking either — flag it on the existing field meant for exactly this ("something's
-    // wrong with this appointment's calendar mirror, needs a human"), and log it on the trail.
-    await db.appointment.update({
-      where: { id: appointment.id },
+    // wrong with this booking's calendar mirror, needs a human"), and log it on the trail.
+    await db.booking.update({
+      where: { id: booking.id },
       data: {
         googleCalendarSyncError: `Google Calendar shows this moved to ${newStartAt.toISOString()}, but that conflicts with another booking — needs manual review.`,
       },
     });
-    await db.appointmentEvent.create({
+    await db.bookingEvent.create({
       data: {
-        appointmentId: appointment.id,
-        doctorId,
-        fromStatus: appointment.status,
-        toStatus: appointment.status,
+        bookingId: booking.id,
+        tenantId,
+        fromStatus: booking.status,
+        toStatus: booking.status,
         actor: by.actor,
         reason: "Time changed on Google Calendar, but the new time conflicts with another booking.",
       },
@@ -185,16 +187,16 @@ async function applyExternalCalendarChange(doctorId: string, event: calendar_v3.
     return;
   }
 
-  await db.appointment.update({
-    where: { id: appointment.id },
+  await db.booking.update({
+    where: { id: booking.id },
     data: { startAt: newStartAt, endAt: newEndAt, googleCalendarSyncError: null },
   });
-  await db.appointmentEvent.create({
+  await db.bookingEvent.create({
     data: {
-      appointmentId: appointment.id,
-      doctorId,
-      fromStatus: appointment.status,
-      toStatus: appointment.status,
+      bookingId: booking.id,
+      tenantId,
+      fromStatus: booking.status,
+      toStatus: booking.status,
       actor: by.actor,
       reason: "Time changed directly on Google Calendar.",
     },
@@ -210,15 +212,15 @@ async function applyExternalCalendarChange(doctorId: string, event: calendar_v3.
  * freebusy read-back in availability-service.ts still protects against double-booking even
  * when incremental sync has fallen behind.
  */
-export async function reconcileCalendarChanges(doctorId: string): Promise<void> {
-  const doctor = await db.doctor.findUnique({ where: { id: doctorId } });
-  if (!doctor?.googleCalendarId) return;
+export async function reconcileCalendarChanges(tenantId: string): Promise<void> {
+  const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant?.googleCalendarId) return;
 
-  const calendar = await getCalendarClient(doctorId);
+  const calendar = await getCalendarClient(tenantId);
   if (!calendar) return;
 
-  if (!doctor.googleCalendarSyncToken) {
-    await bootstrapSyncToken(doctorId, doctor.googleCalendarId);
+  if (!tenant.googleCalendarSyncToken) {
+    await bootstrapSyncToken(tenantId, tenant.googleCalendarId);
     return;
   }
 
@@ -228,35 +230,35 @@ export async function reconcileCalendarChanges(doctorId: string): Promise<void> 
   try {
     do {
       const { data } = await calendar.events.list({
-        calendarId: doctor.googleCalendarId,
-        syncToken: doctor.googleCalendarSyncToken,
+        calendarId: tenant.googleCalendarId,
+        syncToken: tenant.googleCalendarSyncToken,
         pageToken,
         showDeleted: true,
       });
       changedEvents.push(...(data.items ?? []));
       pageToken = data.nextPageToken ?? undefined;
       if (!pageToken && data.nextSyncToken) {
-        await db.doctor.update({
-          where: { id: doctorId },
+        await db.tenant.update({
+          where: { id: tenantId },
           data: { googleCalendarSyncToken: data.nextSyncToken },
         });
       }
     } while (pageToken);
   } catch (error) {
     if (isGoogleGoneError(error)) {
-      await db.doctor.update({ where: { id: doctorId }, data: { googleCalendarSyncToken: null } });
-      await bootstrapSyncToken(doctorId, doctor.googleCalendarId);
+      await db.tenant.update({ where: { id: tenantId }, data: { googleCalendarSyncToken: null } });
+      await bootstrapSyncToken(tenantId, tenant.googleCalendarId);
       return;
     }
-    console.error(`[calendar-watch] reconcile failed for doctor ${doctorId}:`, error);
+    console.error(`[calendar-watch] reconcile failed for tenant ${tenantId}:`, error);
     return;
   }
 
   for (const event of changedEvents) {
     try {
-      await applyExternalCalendarChange(doctorId, event);
+      await applyExternalCalendarChange(tenantId, event);
     } catch (error) {
-      console.error(`[calendar-watch] Failed to apply change for doctor ${doctorId}, event ${event.id}:`, error);
+      console.error(`[calendar-watch] Failed to apply change for tenant ${tenantId}, event ${event.id}:`, error);
     }
   }
 }
@@ -268,12 +270,12 @@ export async function reconcileCalendarChanges(doctorId: string): Promise<void> 
  * in-process node-cron path and the serverless /api/cron/reminders path with no extra wiring.
  */
 export async function renewExpiringCalendarWatches(): Promise<{ renewed: number; failed: number }> {
-  // No point querying doctors at all if there's nowhere for Google to send notifications —
+  // No point querying tenants at all if there's nowhere for Google to send notifications —
   // startWatchingCalendar would just no-op for every one of them (e.g. local dev, no tunnel).
   if (!calendarWebhookUrl()) return { renewed: 0, failed: 0 };
 
   const expiringSoon = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const doctors = await db.doctor.findMany({
+  const tenants = await db.tenant.findMany({
     where: {
       googleCalendarRefreshToken: { not: null },
       googleCalendarId: { not: null },
@@ -283,14 +285,14 @@ export async function renewExpiringCalendarWatches(): Promise<{ renewed: number;
 
   let renewed = 0;
   let failed = 0;
-  for (const doctor of doctors) {
+  for (const tenant of tenants) {
     try {
-      await stopWatchingCalendar(doctor.id);
-      await startWatchingCalendar(doctor.id, doctor.googleCalendarId!);
+      await stopWatchingCalendar(tenant.id);
+      await startWatchingCalendar(tenant.id, tenant.googleCalendarId!);
       renewed += 1;
     } catch (error) {
       failed += 1;
-      console.error(`[calendar-watch] Failed to renew watch for doctor ${doctor.id}:`, error);
+      console.error(`[calendar-watch] Failed to renew watch for tenant ${tenant.id}:`, error);
     }
   }
   return { renewed, failed };

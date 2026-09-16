@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resolveSettings, updateSetting, listRecentAudit } from "./settings-repository";
 
-async function createDoctor(overrides: Partial<Parameters<typeof db.doctor.create>[0]["data"]> = {}) {
-  return db.doctor.create({
+async function createDoctor(overrides: Partial<Parameters<typeof db.tenant.create>[0]["data"]> = {}) {
+  const doctor = await db.tenant.create({
     data: {
-      name: "Mehtab",
-      title: "Dr.",
       clinicName: "Test Clinic",
       timezone: "UTC",
       emergencyScript: "Call 108 immediately.",
@@ -14,12 +12,17 @@ async function createDoctor(overrides: Partial<Parameters<typeof db.doctor.creat
       ...overrides,
     },
   });
+  const location = await db.location.create({ data: { tenantId: doctor.id, timezone: "UTC" } });
+  await db.resource.create({
+    data: { tenantId: doctor.id, locationId: location.id, type: "practitioner", name: "Mehtab", title: "Dr." },
+  });
+  return doctor;
 }
 
 async function cleanup(doctorId: string) {
-  await db.settingsAudit.deleteMany({ where: { doctorId } });
-  await db.clinicSettings.deleteMany({ where: { doctorId } });
-  await db.doctor.delete({ where: { id: doctorId } });
+  await db.settingsAudit.deleteMany({ where: { tenantId: doctorId } });
+  await db.clinicSettings.deleteMany({ where: { tenantId: doctorId } });
+  await db.tenant.delete({ where: { id: doctorId } });
 }
 
 describe("resolveSettings", () => {
@@ -30,7 +33,7 @@ describe("resolveSettings", () => {
     doctorId = undefined;
   });
 
-  it("falls back to Doctor columns when no ClinicSettings row exists yet", async () => {
+  it("falls back to Tenant/Resource columns when no ClinicSettings row exists yet", async () => {
     const doctor = await createDoctor();
     doctorId = doctor.id;
 
@@ -39,7 +42,7 @@ describe("resolveSettings", () => {
     expect(settings.clinic.name).toBe("Test Clinic");
     expect(settings.doctors[0].name).toBe("Mehtab");
     expect(settings.doctors[0].title).toBe("Dr.");
-    // The exact backfill case: Doctor.emergencyScript migrates into safety.emergencyScript.
+    // The exact backfill case: Tenant.emergencyScript migrates into safety.emergencyScript.
     expect(settings.safety.emergencyScript).toBe("Call 108 immediately.");
     expect(settings.safety.escalationWhatsappNumber).toBe("+15550001111");
     expect(settings.messaging.tone).toBe("friendly");
@@ -50,16 +53,16 @@ describe("resolveSettings", () => {
     const doctor = await createDoctor();
     doctorId = doctor.id;
 
-    // Only messaging.tone stored — everything else should still resolve from Doctor fallback.
+    // Only messaging.tone stored — everything else should still resolve from Tenant fallback.
     await db.clinicSettings.create({
-      data: { doctorId: doctor.id, data: { messaging: { tone: "formal" } } },
+      data: { tenantId: doctor.id, data: { messaging: { tone: "formal" } } },
     });
 
     const settings = await resolveSettings(doctor.id);
 
     expect(settings.messaging.tone).toBe("formal");
     expect(settings.messaging.disclosureEnabled).toBe(true); // still the default
-    expect(settings.clinic.name).toBe("Test Clinic"); // still from the Doctor row
+    expect(settings.clinic.name).toBe("Test Clinic"); // still from the Tenant row
   });
 });
 

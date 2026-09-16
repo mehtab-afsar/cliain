@@ -2,6 +2,7 @@ import "server-only";
 import { runAgentTurn } from "./agent-loop";
 import { sendWhatsappText } from "./whatsapp-client";
 import { hasProcessedWamid } from "./conversation-store";
+import { verifyToolToken } from "./tool-token";
 
 type InboundMessage = { from: string; wamid: string; text: string };
 
@@ -29,13 +30,22 @@ export function parseInboundMessage(payload: WhatsappWebhookPayload): InboundMes
   return { from: message.from, wamid: message.id, text: message.text.body };
 }
 
-/** Runs the agent loop for an inbound message and sends the reply back. Dedups by wamid. */
-export async function handleInboundMessage(doctorId: string, message: InboundMessage): Promise<void> {
+/**
+ * Runs the agent loop for an inbound message and sends the reply back. Dedups by wamid.
+ *
+ * `token` must have been minted by the calling route (see tool-token.ts) only after Meta's
+ * signature on this delivery was verified — tenantId is derived from it here, not trusted from
+ * any other source.
+ */
+export async function handleInboundMessage(token: string, message: InboundMessage): Promise<void> {
+  const session = verifyToolToken(token);
+  if (!session) throw new Error("handleInboundMessage called with an invalid or expired tool token.");
+
   if (await hasProcessedWamid(message.wamid)) return;
 
-  const reply = await runAgentTurn(doctorId, message.from, message.text, message.wamid);
+  const reply = await runAgentTurn(token, message.from, message.text, message.wamid);
   // null means this patient has been handed off to staff — send nothing (see agent-loop.ts).
   if (reply !== null) {
-    await sendWhatsappText(doctorId, message.from, reply);
+    await sendWhatsappText(session.tenantId, message.from, reply);
   }
 }

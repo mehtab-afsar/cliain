@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { getWhatsappAppSecret, getWhatsappVerifyToken } from "@/lib/integration-credentials";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { verifyMetaSignature } from "@/lib/webhook-signatures";
+import { mintToolToken } from "@/features/ai-agent/services/tool-token";
 import {
   handleInboundMessage,
   parseInboundMessage,
@@ -49,6 +50,11 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
   }
 
+  // Minted only now that the signature above has proven this delivery really belongs to
+  // `doctorId` (when an app secret is configured) — everything downstream (the agent loop,
+  // every tool call) derives its tenant from this token, never from the path segment again.
+  const toolToken = mintToolToken({ tenantId: doctorId, channel: "whatsapp" });
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON.parse's own return type
   let payload: any;
   try {
@@ -61,7 +67,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   if (message) {
     after(() =>
-      handleInboundMessage(doctorId, message).catch((error) => {
+      handleInboundMessage(toolToken, message).catch((error) => {
         console.error("[whatsapp-webhook] Failed to handle inbound message:", error);
       }),
     );

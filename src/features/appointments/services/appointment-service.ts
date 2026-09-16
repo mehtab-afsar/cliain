@@ -1,27 +1,27 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { Prisma, type Appointment, type AppointmentStatus } from "@prisma/client";
+import { Prisma, type Booking, type BookingStatus } from "@prisma/client";
 import { resolveTimezone } from "@/lib/timezone";
-import { getDoctorById } from "./doctor-repository";
+import { getTenantById, getPrimaryResourceForTenant, getPrimaryOfferingForTenant } from "./doctor-repository";
 import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, getBusyIntervals } from "./calendar-sync";
 
 const SLOT_TAKEN_MESSAGE = "That slot was just booked by someone else — please choose another time.";
 
 /**
  * A best-effort guard against a slot that's free in Postgres but blocked directly on the
- * doctor's real Google Calendar. Deliberately called BEFORE writeIfSlotFree, not inside its
+ * tenant's real Google Calendar. Deliberately called BEFORE writeIfSlotFree, not inside its
  * transaction — an external HTTP call has no place inside a Serializable transaction (it would
  * hold Postgres locks open across network I/O). This only narrows the race window between
  * showing a slot and committing the booking, it doesn't eliminate it; getBusyIntervals already
  * fails open (returns []) on any Calendar error, so this never blocks booking on its own.
  */
 async function assertNotCalendarBusy(
-  doctor: { id: string; googleCalendarId: string | null },
+  tenant: { id: string; googleCalendarId: string | null },
   startAt: Date,
   endAt: Date,
 ): Promise<void> {
-  if (!doctor.googleCalendarId) return;
-  const busy = await getBusyIntervals(doctor.id, doctor.googleCalendarId, startAt, endAt);
+  if (!tenant.googleCalendarId) return;
+  const busy = await getBusyIntervals(tenant.id, tenant.googleCalendarId, startAt, endAt);
   if (busy.some((block) => startAt < block.end && endAt > block.start)) {
     throw new Error(SLOT_TAKEN_MESSAGE);
   }
@@ -49,23 +49,23 @@ function isSerializationFailure(error: unknown): boolean {
   return false;
 }
 
-/** Who made a transition, for the AppointmentEvent audit trail. */
+/** Who made a transition, for the BookingEvent audit trail. */
 export type Actor = { actor: string; channel?: string | null };
 
 type EventInput = {
-  appointmentId: string;
-  doctorId: string;
-  fromStatus: AppointmentStatus | null;
-  toStatus: AppointmentStatus;
+  bookingId: string;
+  tenantId: string;
+  fromStatus: BookingStatus | null;
+  toStatus: BookingStatus;
   by: Actor;
   reason?: string | null;
 };
 
 function writeEvent(tx: Prisma.TransactionClient, input: EventInput) {
-  return tx.appointmentEvent.create({
+  return tx.bookingEvent.create({
     data: {
-      appointmentId: input.appointmentId,
-      doctorId: input.doctorId,
+      bookingId: input.bookingId,
+      tenantId: input.tenantId,
       fromStatus: input.fromStatus,
       toStatus: input.toStatus,
       actor: input.by.actor,
@@ -85,20 +85,25 @@ function writeEvent(tx: Prisma.TransactionClient, input: EventInput) {
  * the same friendly message the manual check already threw, so callers don't need to change.
  * Deliberately not retried automatically: a P2034 here means the slot really was just taken,
  * so surfacing it as "pick another time" is the correct behavior, not a transient hiccup.
+ *
+ * Scoped by resourceId, not tenantId: a tenant can have more than one bookable resource (see
+ * Resource), and two different resources double-booking the same clock time is not a
+ * conflict. Scoping by tenantId alone — as this used to, back when a tenant only ever had one
+ * implicit resource — would falsely reject a free slot on a different resource.
  */
 async function writeIfSlotFree<T>(
-  conflictScope: { doctorId: string; startAt: Date; endAt: Date; excludeAppointmentId?: string },
+  conflictScope: { resourceId: string; startAt: Date; endAt: Date; excludeBookingId?: string },
   write: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   try {
     return await db.$transaction(
       async (tx) => {
-        const conflict = await tx.appointment.findFirst({
+        const conflict = await tx.booking.findFirst({
           where: {
-            doctorId: conflictScope.doctorId,
+            resourceId: conflictScope.resourceId,
             status: "booked",
-            ...(conflictScope.excludeAppointmentId
-              ? { id: { not: conflictScope.excludeAppointmentId } }
+            ...(conflictScope.excludeBookingId
+              ? { id: { not: conflictScope.excludeBookingId } }
               : {}),
             startAt: { lt: conflictScope.endAt },
             endAt: { gt: conflictScope.startAt },
@@ -121,25 +126,25 @@ async function writeIfSlotFree<T>(
 
 /** A plain status transition that doesn't touch startAt/endAt — arrived, completed, no-show, cancel. */
 async function transitionStatus(
-  doctorId: string,
-  appointmentId: string,
-  toStatus: AppointmentStatus,
+  tenantId: string,
+  bookingId: string,
+  toStatus: BookingStatus,
   by: Actor,
   reason: string | undefined,
-  extra?: Prisma.AppointmentUpdateInput,
-): Promise<Appointment> {
-  const existing = await db.appointment.findFirstOrThrow({
-    where: { id: appointmentId, doctorId },
+  extra?: Prisma.BookingUpdateInput,
+): Promise<Booking> {
+  const existing = await db.booking.findFirstOrThrow({
+    where: { id: bookingId, tenantId },
   });
 
   return db.$transaction(async (tx) => {
-    const updated = await tx.appointment.update({
-      where: { id: appointmentId },
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
       data: { status: toStatus, statusReason: reason ?? null, ...extra },
     });
     await writeEvent(tx, {
-      appointmentId,
-      doctorId,
+      bookingId,
+      tenantId,
       fromStatus: existing.status,
       toStatus,
       by,
@@ -157,23 +162,27 @@ export type BookAppointmentInput = {
 };
 
 export async function bookAppointment(
-  doctorId: string,
+  tenantId: string,
   input: BookAppointmentInput,
   by: Actor,
-): Promise<Appointment> {
-  const doctor = await getDoctorById(doctorId);
+): Promise<Booking> {
+  const tenant = await getTenantById(tenantId);
+  const resource = await getPrimaryResourceForTenant(tenantId);
+  const offering = await getPrimaryOfferingForTenant(tenantId);
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 
-  const patient = await db.patient.findFirstOrThrow({ where: { id: input.patientId, doctorId: doctor.id } });
+  const customer = await db.customer.findFirstOrThrow({ where: { id: input.patientId, tenantId: tenant.id } });
 
-  await assertNotCalendarBusy(doctor, startAt, endAt);
+  await assertNotCalendarBusy(tenant, startAt, endAt);
 
-  const appointment = await writeIfSlotFree({ doctorId: doctor.id, startAt, endAt }, async (tx) => {
-    const created = await tx.appointment.create({
+  const booking = await writeIfSlotFree({ resourceId: resource.id, startAt, endAt }, async (tx) => {
+    const created = await tx.booking.create({
       data: {
-        doctorId: doctor.id,
-        patientId: input.patientId,
+        tenantId: tenant.id,
+        customerId: input.patientId,
+        resourceId: resource.id,
+        offeringId: offering.id,
         startAt,
         endAt,
         reason: input.reason,
@@ -181,8 +190,8 @@ export async function bookAppointment(
       },
     });
     await writeEvent(tx, {
-      appointmentId: created.id,
-      doctorId: doctor.id,
+      bookingId: created.id,
+      tenantId: tenant.id,
       fromStatus: null,
       toStatus: "booked",
       by,
@@ -190,79 +199,79 @@ export async function bookAppointment(
     return created;
   });
 
-  if (doctor.googleCalendarId) {
+  if (tenant.googleCalendarId) {
     const sync = await createCalendarEvent({
-      doctorId: doctor.id,
-      calendarId: doctor.googleCalendarId,
-      appointmentId: appointment.id,
-      summary: `${patient.name ?? "Patient"} — ${doctor.name}`,
+      tenantId: tenant.id,
+      calendarId: tenant.googleCalendarId,
+      bookingId: booking.id,
+      summary: `${customer.name ?? "Patient"} — ${resource.name}`,
       description: input.reason,
       startAt,
       endAt,
-      timezone: resolveTimezone(doctor.timezone),
+      timezone: resolveTimezone(resource.location.timezone ?? tenant.timezone),
     });
-    await db.appointment.update({
-      where: { id: appointment.id },
+    await db.booking.update({
+      where: { id: booking.id },
       data: sync.ok
         ? { googleCalendarEventId: sync.eventId }
         : { googleCalendarSyncError: sync.error },
     });
   }
 
-  return appointment;
+  return booking;
 }
 
 export async function cancelAppointment(
-  doctorId: string,
-  appointmentId: string,
+  tenantId: string,
+  bookingId: string,
   by: Actor,
   reason?: string,
   // Set by calendar-watch-service.ts when the cancellation is itself the reaction to the
   // Calendar event having already been deleted externally — calling deleteCalendarEvent in
   // that case would be a redundant no-op against an event that's already gone.
   options?: { skipCalendarSync?: boolean },
-): Promise<Appointment> {
-  const doctor = await getDoctorById(doctorId);
-  const existing = await db.appointment.findFirstOrThrow({
-    where: { id: appointmentId, doctorId: doctor.id },
+): Promise<Booking> {
+  const tenant = await getTenantById(tenantId);
+  const existing = await db.booking.findFirstOrThrow({
+    where: { id: bookingId, tenantId: tenant.id },
   });
 
-  const appointment = await transitionStatus(doctorId, appointmentId, "cancelled", by, reason);
+  const booking = await transitionStatus(tenantId, bookingId, "cancelled", by, reason);
 
-  if (!options?.skipCalendarSync && doctor.googleCalendarId && existing.googleCalendarEventId) {
-    await deleteCalendarEvent(doctor.id, doctor.googleCalendarId, existing.googleCalendarEventId);
+  if (!options?.skipCalendarSync && tenant.googleCalendarId && existing.googleCalendarEventId) {
+    await deleteCalendarEvent(tenant.id, tenant.googleCalendarId, existing.googleCalendarEventId);
   }
 
-  return appointment;
+  return booking;
 }
 
 export async function markArrived(
-  doctorId: string,
-  appointmentId: string,
+  tenantId: string,
+  bookingId: string,
   by: Actor,
-): Promise<Appointment> {
-  return transitionStatus(doctorId, appointmentId, "arrived", by, undefined);
+): Promise<Booking> {
+  return transitionStatus(tenantId, bookingId, "arrived", by, undefined);
 }
 
 export async function completeAppointment(
-  doctorId: string,
-  appointmentId: string,
+  tenantId: string,
+  bookingId: string,
   by: Actor,
   reason?: string,
-): Promise<Appointment> {
-  return transitionStatus(doctorId, appointmentId, "completed", by, reason, {
+): Promise<Booking> {
+  return transitionStatus(tenantId, bookingId, "completed", by, reason, {
     completedAt: new Date(),
     completedBy: by.actor,
   });
 }
 
 export async function markNoShow(
-  doctorId: string,
-  appointmentId: string,
+  tenantId: string,
+  bookingId: string,
   by: Actor,
   reason?: string,
-): Promise<Appointment> {
-  return transitionStatus(doctorId, appointmentId, "no_show", by, reason);
+): Promise<Booking> {
+  return transitionStatus(tenantId, bookingId, "no_show", by, reason);
 }
 
 export type RescheduleAppointmentInput = {
@@ -276,45 +285,48 @@ export type RescheduleAppointmentInput = {
  * new time, rather than mutating startAt/endAt in place — so "originally 2pm, moved to 4pm"
  * stays on record as two distinct rows instead of being overwritten. Both writes, plus the
  * conflict check for the new slot, happen in one Serializable transaction (same guarantee as
- * bookAppointment) — excludeAppointmentId is still needed even though the old row moves to a
+ * bookAppointment) — excludeBookingId is still needed even though the old row moves to a
  * non-"booked" status, because that flip happens inside this same transaction, after the
  * conflict check already ran.
  */
 export async function rescheduleAppointment(
-  doctorId: string,
+  tenantId: string,
   input: RescheduleAppointmentInput,
   by: Actor,
   reason?: string,
-): Promise<Appointment> {
-  const doctor = await getDoctorById(doctorId);
-  const existing = await db.appointment.findFirstOrThrow({
-    where: { id: input.appointmentId, doctorId: doctor.id },
+): Promise<Booking> {
+  const tenant = await getTenantById(tenantId);
+  const resource = await getPrimaryResourceForTenant(tenantId);
+  const existing = await db.booking.findFirstOrThrow({
+    where: { id: input.appointmentId, tenantId: tenant.id },
   });
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 
-  await assertNotCalendarBusy(doctor, startAt, endAt);
+  await assertNotCalendarBusy(tenant, startAt, endAt);
 
-  const appointment = await writeIfSlotFree(
-    { doctorId: doctor.id, startAt, endAt, excludeAppointmentId: existing.id },
+  const booking = await writeIfSlotFree(
+    { resourceId: existing.resourceId, startAt, endAt, excludeBookingId: existing.id },
     async (tx) => {
-      await tx.appointment.update({
+      await tx.booking.update({
         where: { id: existing.id },
         data: { status: "rescheduled", statusReason: reason ?? null },
       });
       await writeEvent(tx, {
-        appointmentId: existing.id,
-        doctorId: doctor.id,
+        bookingId: existing.id,
+        tenantId: tenant.id,
         fromStatus: existing.status,
         toStatus: "rescheduled",
         by,
         reason,
       });
 
-      const created = await tx.appointment.create({
+      const created = await tx.booking.create({
         data: {
-          doctorId: doctor.id,
-          patientId: existing.patientId,
+          tenantId: tenant.id,
+          customerId: existing.customerId,
+          resourceId: existing.resourceId,
+          offeringId: existing.offeringId,
           startAt,
           endAt,
           reason: existing.reason,
@@ -323,8 +335,8 @@ export async function rescheduleAppointment(
         },
       });
       await writeEvent(tx, {
-        appointmentId: created.id,
-        doctorId: doctor.id,
+        bookingId: created.id,
+        tenantId: tenant.id,
         fromStatus: null,
         toStatus: "booked",
         by,
@@ -334,54 +346,54 @@ export async function rescheduleAppointment(
     },
   );
 
-  if (doctor.googleCalendarId && existing.googleCalendarEventId) {
-    await updateCalendarEvent(doctor.id, doctor.googleCalendarId, existing.googleCalendarEventId, {
+  if (tenant.googleCalendarId && existing.googleCalendarEventId) {
+    await updateCalendarEvent(tenant.id, tenant.googleCalendarId, existing.googleCalendarEventId, {
       startAt,
       endAt,
-      timezone: resolveTimezone(doctor.timezone),
+      timezone: resolveTimezone(resource.location.timezone ?? tenant.timezone),
     });
     // The calendar event id lived on the old row — carry it to the new one so a later
-    // cancel/reschedule of this appointment can still find and manage that same event.
-    await db.appointment.update({
-      where: { id: appointment.id },
+    // cancel/reschedule of this booking can still find and manage that same event.
+    await db.booking.update({
+      where: { id: booking.id },
       data: { googleCalendarEventId: existing.googleCalendarEventId },
     });
   }
 
-  return appointment;
+  return booking;
 }
 
-export async function listUpcomingAppointmentsForPatient(patientId: string) {
-  return db.appointment.findMany({
-    where: { patientId, status: "booked", startAt: { gt: new Date() } },
+export async function listUpcomingAppointmentsForPatient(customerId: string) {
+  return db.booking.findMany({
+    where: { customerId, status: "booked", startAt: { gt: new Date() } },
     orderBy: { startAt: "asc" },
   });
 }
 
-export async function listAppointments(doctorId: string) {
-  return db.appointment.findMany({
+export async function listAppointments(tenantId: string) {
+  return db.booking.findMany({
     // "rescheduled" rows are frozen, superseded history — the row a reschedule creates is
     // what shows up here instead; the old one is still visible via rescheduledFrom on the
-    // appointment detail page.
-    where: { doctorId, status: { not: "rescheduled" } },
-    include: { patient: true },
+    // booking detail page.
+    where: { tenantId, status: { not: "rescheduled" } },
+    include: { customer: true },
     orderBy: { startAt: "asc" },
   });
 }
 
-export async function getAppointmentDetail(doctorId: string, appointmentId: string) {
-  const appointment = await db.appointment.findFirstOrThrow({
-    where: { id: appointmentId, doctorId },
+export async function getAppointmentDetail(tenantId: string, bookingId: string) {
+  const booking = await db.booking.findFirstOrThrow({
+    where: { id: bookingId, tenantId },
     include: {
-      patient: true,
+      customer: true,
       events: { orderBy: { at: "desc" } },
     },
   });
 
   const transcript = await db.conversation.findMany({
-    where: { patientId: appointment.patientId },
+    where: { customerId: booking.customerId },
     orderBy: { createdAt: "asc" },
   });
 
-  return { appointment, transcript };
+  return { appointment: booking, transcript };
 }

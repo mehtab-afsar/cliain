@@ -19,16 +19,23 @@ function nextIsoWeekday(from: DateTime, isoWeekday: number): DateTime {
 }
 
 async function createDoctorWithHours(dayOfWeek: number, startTime: string, endTime: string, isOpen = true) {
-  const doctor = await db.doctor.create({ data: { name: "Dr. Test", timezone: "UTC" } });
+  const doctor = await db.tenant.create({ data: { timezone: "UTC" } });
+  const location = await db.location.create({ data: { tenantId: doctor.id, timezone: "UTC" } });
+  const resource = await db.resource.create({
+    data: { tenantId: doctor.id, locationId: location.id, type: "practitioner", name: "Dr. Test" },
+  });
+  await db.offering.create({
+    data: { tenantId: doctor.id, name: "Consultation", durationMinutes: 30, resourceType: "practitioner" },
+  });
   await db.workingHours.create({
-    data: { doctorId: doctor.id, dayOfWeek, startTime, endTime, isOpen },
+    data: { resourceId: resource.id, dayOfWeek, startTime, endTime, isOpen },
   });
   return doctor;
 }
 
 async function cleanup(doctorId: string) {
-  await db.appointment.deleteMany({ where: { doctorId } });
-  await db.doctor.delete({ where: { id: doctorId } });
+  await db.booking.deleteMany({ where: { tenantId: doctorId } });
+  await db.tenant.delete({ where: { id: doctorId } });
 }
 
 describe("checkAvailability", () => {
@@ -50,8 +57,8 @@ describe("checkAvailability", () => {
     const today = now.toISODate()!;
     const doctor = await createDoctorWithHours(now.weekday % 7, "09:00", "17:00");
     doctorId = doctor.id;
-    const patient = await db.patient.create({
-      data: { doctorId, phone: `+1555${Date.now()}${Math.floor(Math.random() * 1000)}` },
+    const patient = await db.customer.create({
+      data: { tenantId: doctorId, phone: `+1555${Date.now()}${Math.floor(Math.random() * 1000)}` },
     });
 
     await bookAppointment(
@@ -126,7 +133,7 @@ describe("checkAvailability", () => {
     const today = now.toISODate()!;
     const doctor = await createDoctorWithHours(now.weekday % 7, "09:00", "17:00");
     doctorId = doctor.id;
-    await db.doctor.update({ where: { id: doctorId }, data: { googleCalendarId: "primary" } });
+    await db.tenant.update({ where: { id: doctorId }, data: { googleCalendarId: "primary" } });
 
     vi.mocked(getBusyIntervals).mockResolvedValueOnce([
       { start: new Date(`${today}T15:00:00.000Z`), end: new Date(`${today}T15:30:00.000Z`) },

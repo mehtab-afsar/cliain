@@ -1,9 +1,9 @@
 export type ToolContext = {
   /** The WhatsApp sender's phone number — backend-controlled, never something Claude supplies. */
   patientPhone: string;
-  /** Which clinic this conversation belongs to — resolved from the doctorId path segment in the per-clinic webhook URL (see src/app/api/webhooks). */
-  doctorId: string;
-  /** Which channel this tool call came in on — tags the AppointmentEvent audit trail. */
+  /** Which tenant this conversation belongs to — resolved from the doctorId path segment in the per-tenant webhook URL (see src/app/api/webhooks). */
+  tenantId: string;
+  /** Which channel this tool call came in on — tags the BookingEvent audit trail. */
   channel: "whatsapp" | "voice";
 };
 

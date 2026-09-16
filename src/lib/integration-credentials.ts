@@ -1,13 +1,13 @@
 import "server-only";
-import { Prisma, type Doctor } from "@prisma/client";
+import { Prisma, type Tenant } from "@prisma/client";
 import { db } from "./db";
 import { env, vapiPublicUrl } from "./env";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { googleCalendarConfigured } from "./google-calendar-oauth";
 import { stopWatchingCalendar } from "@/features/appointments/services/calendar-watch-service";
 
-async function getDoctorRow(doctorId: string): Promise<Doctor | null> {
-  return db.doctor.findUnique({ where: { id: doctorId } });
+async function getDoctorRow(doctorId: string): Promise<Tenant | null> {
+  return db.tenant.findUnique({ where: { id: doctorId } });
 }
 
 export type WhatsappConfig = { phoneNumberId: string; accessToken: string };
@@ -160,7 +160,7 @@ export async function saveIntegrationCredentials(
         );
       }
 
-      await db.doctor.update({
+      await db.tenant.update({
         where: { id: doctorId },
         data: {
           ...(input.phoneNumberId ? { whatsappPhoneNumberId: input.phoneNumberId } : {}),
@@ -172,7 +172,7 @@ export async function saveIntegrationCredentials(
     } else if (input.calendarId) {
       // Editing which calendar to sync to on an already-connected clinic — connecting in the
       // first place happens via the OAuth callback, not here.
-      await db.doctor.update({
+      await db.tenant.update({
         where: { id: doctorId },
         data: { googleCalendarId: input.calendarId },
       });
@@ -192,7 +192,7 @@ export async function disconnectIntegration(
   provider: "whatsapp" | "googleCalendar",
 ): Promise<IntegrationsStatus> {
   if (provider === "whatsapp") {
-    await db.doctor.update({
+    await db.tenant.update({
       where: { id: doctorId },
       data: {
         whatsappPhoneNumberId: null,
@@ -207,7 +207,7 @@ export async function disconnectIntegration(
     // reconcileCalendarChanges would then find no usable OAuth client and fail quietly forever.
     await stopWatchingCalendar(doctorId);
 
-    await db.doctor.update({
+    await db.tenant.update({
       where: { id: doctorId },
       data: {
         googleCalendarRefreshToken: null,

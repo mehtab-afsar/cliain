@@ -20,9 +20,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
         reason: appointment.reason,
         rescheduledFromId: appointment.rescheduledFromId,
         patient: {
-          id: appointment.patient.id,
-          name: appointment.patient.name,
-          phone: appointment.patient.phone,
+          id: appointment.customer.id,
+          name: appointment.customer.name,
+          phone: appointment.customer.phone,
         },
         events: appointment.events.map((event) => ({
           id: event.id,

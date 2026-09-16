@@ -27,51 +27,51 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
     const rangeStart = new Date(target - WINDOW_SLACK_MINUTES * 60 * 1000);
     const rangeEnd = new Date(target + WINDOW_SLACK_MINUTES * 60 * 1000);
 
-    const dueAppointments = await db.appointment.findMany({
+    const dueBookings = await db.booking.findMany({
       where: {
         status: "booked",
         startAt: { gte: rangeStart, lte: rangeEnd },
         [window.field]: null,
       },
-      include: { patient: true, doctor: true },
+      include: { customer: true, tenant: true, resource: { include: { location: true } } },
     });
 
-    for (const appointment of dueAppointments) {
-      const local = DateTime.fromJSDate(appointment.startAt, {
-        zone: resolveTimezone(appointment.doctor.timezone),
+    for (const booking of dueBookings) {
+      const local = DateTime.fromJSDate(booking.startAt, {
+        zone: resolveTimezone(booking.resource.location.timezone ?? booking.tenant.timezone),
       });
       const dateLabel = local.toFormat("cccc, LLL d");
       const timeLabel = local.toFormat("h:mm a");
       let anySucceeded = false;
 
       try {
-        await sendWhatsappTemplate(appointment.doctorId, appointment.patient.phone, window.template, "en_US", [
-          appointment.patient.name ?? "there",
-          appointment.doctor.name,
+        await sendWhatsappTemplate(booking.tenantId, booking.customer.phone, window.template, "en_US", [
+          booking.customer.name ?? "there",
+          booking.resource.name,
           dateLabel,
           timeLabel,
         ]);
         anySucceeded = true;
       } catch (error) {
         console.error(
-          `[reminder-service] Failed to send ${window.template} for appointment ${appointment.id}:`,
+          `[reminder-service] Failed to send ${window.template} for booking ${booking.id}:`,
           error,
         );
       }
 
-      const vapiConfigured = window.voiceCall ? Boolean(await getVapiConfig(appointment.doctorId)) : false;
+      const vapiConfigured = window.voiceCall ? Boolean(await getVapiConfig(booking.tenantId)) : false;
       if (vapiConfigured) {
         const call = await placeOutboundCall({
-          doctor: appointment.doctor,
-          toPhone: appointment.patient.phone,
-          patientName: appointment.patient.name,
+          doctor: booking.tenant,
+          toPhone: booking.customer.phone,
+          patientName: booking.customer.name,
           callPurpose: `to confirm your appointment on ${dateLabel} at ${timeLabel}`,
         });
         if (call.ok) {
           anySucceeded = true;
         } else {
           console.error(
-            `[reminder-service] Failed to place reminder call for appointment ${appointment.id}:`,
+            `[reminder-service] Failed to place reminder call for booking ${booking.id}:`,
             call.error,
           );
         }
@@ -81,8 +81,8 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
       // succeeded just because another failed (a broken WhatsApp template shouldn't cause the
       // patient to get called again every 5 minutes).
       if (anySucceeded) {
-        await db.appointment.update({
-          where: { id: appointment.id },
+        await db.booking.update({
+          where: { id: booking.id },
           data: { [window.field]: new Date() },
         });
         sent += 1;

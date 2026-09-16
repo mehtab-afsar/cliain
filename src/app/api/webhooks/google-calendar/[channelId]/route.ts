@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return new NextResponse("Too many requests", { status: 429 });
   }
 
-  const doctor = await db.doctor.findUnique({ where: { googleCalendarWatchChannelId: channelId } });
+  const doctor = await db.tenant.findUnique({ where: { googleCalendarWatchChannelId: channelId } });
   if (!doctor) {
     // A stopped/rotated/renewed channel can still get a stray in-flight notification — not an
     // error, just tell Google to stop retrying (a 404 is treated as "channel gone").

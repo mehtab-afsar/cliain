@@ -9,13 +9,13 @@ export const getPatientTool: ToolDefinition<Record<string, never>> = {
     "Look up the current patient's record and their upcoming booked appointments, by their WhatsApp phone number.",
   input_schema: { type: "object", properties: {} },
   async execute(_input, context) {
-    const patient = await getPatientByPhone(context.doctorId, context.patientPhone);
+    const patient = await getPatientByPhone(context.tenantId, context.patientPhone);
     if (!patient) return { patient: null, upcomingAppointments: [] };
 
     const upcoming = await listUpcomingAppointmentsForPatient(patient.id);
     return {
       patient: { id: patient.id, name: patient.name, phone: patient.phone },
-      upcomingAppointments: upcoming.map((appt) => ({
+      upcomingAppointments: upcoming.map((appt: { id: string; startAt: Date; endAt: Date }) => ({
         id: appt.id,
         startAt: appt.startAt.toISOString(),
         endAt: appt.endAt.toISOString(),
