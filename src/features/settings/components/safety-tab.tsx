@@ -1,13 +1,25 @@
 "use client";
 
-import { useClinicSettings } from "../hooks/use-clinic-settings";
+import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { SettingsAuditTrail } from "./settings-audit-trail";
-import { DEFAULT_EMERGENCY_SCRIPT } from "../prompt-render";
+import { DEFAULT_EMERGENCY_SCRIPT } from "@/features/templates/prompt-render";
+import { resolveTemplateByVersion } from "@/features/templates/registry";
 
-export function SafetyTab() {
-  const { settings, reload } = useClinicSettings();
+/** `safety.escalationWhatsappNumber` is identical across every template's overridesSchema —
+ *  only the verbatim script's own key name differs (clinic-v1: "emergencyScript", gym-v1:
+ *  "escalationScript"), named by `template.safetyScriptField` and read/written dynamically below. */
+type SharedSafetySettings = {
+  safety: Record<string, unknown> & { escalationWhatsappNumber?: string };
+};
+
+export function SafetyTab({ templateVersion }: { templateVersion: string }) {
+  const template = resolveTemplateByVersion(templateVersion);
+  const { settings, reload } = useTenantSettings<SharedSafetySettings>();
   if (!settings) return null;
+
+  const scriptField = template.safetyScriptField;
+  const scriptValue = (settings.safety[scriptField] as string | undefined) ?? "";
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
@@ -25,10 +37,10 @@ export function SafetyTab() {
         onSaved={reload}
       />
       <SettingsField
-        field="safety.emergencyScript"
+        field={`safety.${scriptField}`}
         label="Emergency guidance"
         multiline
-        initialValue={settings.safety.emergencyScript ?? ""}
+        initialValue={scriptValue}
         defaultValue=""
         placeholder={DEFAULT_EMERGENCY_SCRIPT}
         help="Sent word-for-word on a possible emergency — not paraphrased by the AI."

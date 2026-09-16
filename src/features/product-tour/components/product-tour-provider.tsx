@@ -1,13 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ProductTourContext } from "../context";
-import { TOUR_STEPS } from "../tour-steps";
+import { buildTourSteps } from "../tour-steps";
 import { TourOverlay } from "./tour-overlay";
+import type { TemplateContent } from "@/features/templates/types";
 
 const SEEN_KEY = "cliain:tour-seen";
 
-export function ProductTourProvider({ children }: { children: ReactNode }) {
+type ProductTourProviderProps = {
+  children: ReactNode;
+  labels: TemplateContent["labels"];
+};
+
+export function ProductTourProvider({ children, labels }: ProductTourProviderProps) {
+  const TOUR_STEPS = useMemo(() => buildTourSteps(labels), [labels]);
   const [stepIndex, setStepIndex] = useState(-1);
 
   // Auto-start once, client-only — not derived state.
@@ -31,7 +38,7 @@ export function ProductTourProvider({ children }: { children: ReactNode }) {
     } else {
       setStepIndex(stepIndex + 1);
     }
-  }, [stepIndex]);
+  }, [stepIndex, TOUR_STEPS.length]);
 
   const back = useCallback(() => {
     setStepIndex((index) => Math.max(index - 1, 0));

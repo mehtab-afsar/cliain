@@ -4,7 +4,6 @@ import type { AgentContentBlock, AgentMessage } from "@/lib/model-router";
 import { getPatientByPhone, createPatient } from "@/features/patients/services/patient-service";
 import { db } from "@/lib/db";
 import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
-import type { ClinicSettingsData } from "@/features/settings/schema";
 import { getToolSchemas, runTool } from "./tools";
 import { verifyToolToken } from "./tool-token";
 import { appendMessage, loadConversationHistory } from "./conversation-store";
@@ -39,8 +38,7 @@ export async function runAgentTurn(
   const session = verifyToolToken(token);
   if (!session) throw new Error("runAgentTurn called with an invalid or expired tool token.");
 
-  const { tenant, template, settings: rawSettings } = await resolveTenantConfig(session.tenantId);
-  const settings = rawSettings as ClinicSettingsData;
+  const { tenant, template, commonSettings: settings } = await resolveTenantConfig(session.tenantId);
 
   let patient = await getPatientByPhone(tenant.id, patientPhone);
   if (!patient) {
@@ -58,7 +56,7 @@ export async function runAgentTurn(
   const isFirstTurn = history.length === 0;
 
   const system = buildSystemPrompt(template, settings, tenant.timezone, patient.name, "text");
-  const tools = getToolSchemas().map((tool) => ({
+  const tools = getToolSchemas(template.terms).map((tool) => ({
     name: tool.name,
     description: tool.description,
     inputSchema: tool.input_schema as Record<string, unknown>,
@@ -117,7 +115,7 @@ export async function runAgentTurn(
         const input = toolUse.input as { reason?: string } | undefined;
         if (input?.reason === "emergency") emergencyThisTurn = true;
       }
-      const result = await runTool(toolUse.name, toolUse.input, token, patientPhone);
+      const result = await runTool(toolUse.name, toolUse.input, token, patientPhone, template.terms);
       toolResultBlocks.push({ type: "tool_result", toolUseId: toolUse.id, content: JSON.stringify(result) });
     }
     messages.push({ role: "user", content: toolResultBlocks });
@@ -132,6 +130,7 @@ export async function runAgentTurn(
       { reason: "unresolved", note: "AI providers unavailable." },
       token,
       patientPhone,
+      template.terms,
     );
     reply = ESCALATION_HANDOFF_REPLY;
   } else if (!reply && !escalatedThisTurn) {
@@ -142,6 +141,7 @@ export async function runAgentTurn(
       { reason: "unresolved", note: "Ran out of tool-call attempts." },
       token,
       patientPhone,
+      template.terms,
     );
     reply = ESCALATION_HANDOFF_REPLY;
   } else if (!reply) {
@@ -157,7 +157,7 @@ export async function runAgentTurn(
   }
 
   if (isFirstTurn) {
-    reply = `${buildGreeting(settings)}\n\n${reply}`;
+    reply = `${buildGreeting(settings, template.defaultGreeting)}\n\n${reply}`;
     await db.customer.update({
       where: { id: patient.id },
       data: { consents: { whatsappDisclosure: { grantedAt: new Date().toISOString() } } },

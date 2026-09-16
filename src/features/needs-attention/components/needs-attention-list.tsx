@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { NeedsAttentionItem } from "../types";
+import type { TemplateContent } from "@/features/templates/types";
 
 function formatWaitingSince(iso: string | null): string {
   if (!iso) return "";
@@ -18,16 +19,19 @@ function formatWaitingSince(iso: string | null): string {
 type NeedsAttentionListProps = {
   patients: NeedsAttentionItem[];
   onClear: (patientId: string) => void;
+  labels: TemplateContent["labels"];
 };
 
-export function NeedsAttentionList({ patients, onClear }: NeedsAttentionListProps) {
+export function NeedsAttentionList({ patients, onClear, labels }: NeedsAttentionListProps) {
   return (
     <div className="flex flex-col gap-4">
       {patients.map((patient) => (
         <div key={patient.id} className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-medium text-foreground">{patient.name ?? "Unnamed patient"}</p>
+              <p className="font-medium text-foreground">
+                {patient.name ?? `Unnamed ${labels.customerSingular.toLowerCase()}`}
+              </p>
               <p className="font-mono text-xs text-muted-foreground">{patient.phone}</p>
               <p className="mt-2 text-sm text-foreground">
                 {patient.needsHumanReviewReason ?? "Needs review"}
@@ -63,7 +67,7 @@ export function NeedsAttentionList({ patients, onClear }: NeedsAttentionListProp
                   }
                 >
                   <span className="font-mono text-xs text-muted-foreground">
-                    {message.role === "assistant" ? "AI: " : "Patient: "}
+                    {message.role === "assistant" ? "AI: " : `${labels.customerSingular}: `}
                   </span>
                   {message.content}
                 </p>

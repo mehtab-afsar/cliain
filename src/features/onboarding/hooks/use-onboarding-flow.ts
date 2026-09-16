@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSavedClinic } from "../services/clinic-service";
 import {
   createEmptyDraft,
@@ -8,19 +8,43 @@ import {
   saveDraft,
   submitOnboarding,
 } from "../services/onboarding-service";
-import { ONBOARDING_STEPS, type ClinicBasics, type DoctorProfile, type OnboardingDraft, type WorkingHoursDay } from "../types";
+import { getDraftTemplateVersion, getOnboardingSteps } from "../step-registry";
+import type {
+  ClassSetup,
+  ClinicBasics,
+  DoctorProfile,
+  GymBasics,
+  OnboardingDraft,
+  TrainerProfile,
+  WorkingHoursDay,
+} from "../types";
 
-function validateStep(stepIndex: number, draft: OnboardingDraft): string | null {
-  if (stepIndex === 0) {
-    if (!draft.clinicBasics.clinicName.trim()) return "Enter your clinic's name.";
-    if (!draft.clinicBasics.timezone.trim()) return "Select a timezone.";
+function validateStep(stepKey: string, draft: OnboardingDraft): string | null {
+  if (stepKey === "clinic-basics") {
+    if (!draft.clinicBasics?.clinicName.trim()) return "Enter your clinic's name.";
+    if (!draft.clinicBasics?.timezone.trim()) return "Select a timezone.";
     return null;
   }
-  if (stepIndex === 1) {
-    if (!draft.doctorProfile.doctorName.trim()) return "Enter the doctor's name.";
+  if (stepKey === "doctor-profile") {
+    if (!draft.doctorProfile?.doctorName.trim()) return "Enter the doctor's name.";
     return null;
   }
-  if (stepIndex === 2) {
+  if (stepKey === "gym-basics") {
+    if (!draft.gymBasics?.gymName.trim()) return "Enter your gym's name.";
+    if (!draft.gymBasics?.timezone.trim()) return "Select a timezone.";
+    return null;
+  }
+  if (stepKey === "trainer-profile") {
+    if (!draft.trainerProfile?.trainerName.trim()) return "Enter the trainer's name.";
+    return null;
+  }
+  if (stepKey === "class-setup") {
+    if (!draft.classSetup?.className.trim()) return "Enter a class name.";
+    if (!draft.classSetup || draft.classSetup.durationMinutes <= 0) return "Enter a class duration.";
+    if (!draft.classSetup || draft.classSetup.capacity <= 0) return "Enter a class capacity.";
+    return null;
+  }
+  if (stepKey === "working-hours") {
     const openDays = draft.workingHours.filter((day) => day.isOpen);
     if (openDays.length === 0) return "Open at least one day of the week.";
     const invalidDay = openDays.find((day) => day.startTime >= day.endTime);
@@ -37,6 +61,9 @@ export function useOnboardingFlow() {
   const [error, setError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const templateVersion = getDraftTemplateVersion(draft);
+  const steps = useMemo(() => getOnboardingSteps(templateVersion), [templateVersion]);
 
   // Loading the persisted clinic (if any) or falling back to the in-progress local draft —
   // client-only, so a refresh mid-flow doesn't lose progress.
@@ -61,12 +88,46 @@ export function useOnboardingFlow() {
     if (isHydrated) saveDraft(draft);
   }, [draft, isHydrated]);
 
+  const updateTemplateVersion = useCallback((templateVersion: string) => {
+    setDraft((prev) => ({ ...prev, templateVersion }));
+  }, []);
+
   const updateClinicBasics = useCallback((patch: Partial<ClinicBasics>) => {
-    setDraft((prev) => ({ ...prev, clinicBasics: { ...prev.clinicBasics, ...patch } }));
+    setDraft((prev) => ({
+      ...prev,
+      clinicBasics: { ...(prev.clinicBasics ?? { clinicName: "", timezone: "" }), ...patch },
+    }));
   }, []);
 
   const updateDoctorProfile = useCallback((patch: Partial<DoctorProfile>) => {
-    setDraft((prev) => ({ ...prev, doctorProfile: { ...prev.doctorProfile, ...patch } }));
+    setDraft((prev) => ({
+      ...prev,
+      doctorProfile: { ...(prev.doctorProfile ?? { doctorName: "", specialty: "", whatsappNumber: "" }), ...patch },
+    }));
+  }, []);
+
+  const updateGymBasics = useCallback((patch: Partial<GymBasics>) => {
+    setDraft((prev) => ({
+      ...prev,
+      gymBasics: { ...(prev.gymBasics ?? { gymName: "", timezone: "" }), ...patch },
+    }));
+  }, []);
+
+  const updateTrainerProfile = useCallback((patch: Partial<TrainerProfile>) => {
+    setDraft((prev) => ({
+      ...prev,
+      trainerProfile: { ...(prev.trainerProfile ?? { trainerName: "", role: "", whatsappNumber: "" }), ...patch },
+    }));
+  }, []);
+
+  const updateClassSetup = useCallback((patch: Partial<ClassSetup>) => {
+    setDraft((prev) => ({
+      ...prev,
+      classSetup: {
+        ...(prev.classSetup ?? { className: "", durationMinutes: 45, capacity: 12, dayOfWeek: 1, startTime: "18:00" }),
+        ...patch,
+      },
+    }));
   }, []);
 
   const updateWorkingHoursDay = useCallback(
@@ -82,15 +143,15 @@ export function useOnboardingFlow() {
   );
 
   const goNext = useCallback(() => {
-    const validationError = validateStep(stepIndex, draft);
+    const validationError = validateStep(steps[stepIndex].key, draft);
     if (validationError) {
       setError(validationError);
       return false;
     }
     setError(null);
-    setStepIndex((index) => Math.min(index + 1, ONBOARDING_STEPS.length - 1));
+    setStepIndex((index) => Math.min(index + 1, steps.length - 1));
     return true;
-  }, [stepIndex, draft]);
+  }, [stepIndex, draft, steps]);
 
   const goBack = useCallback(() => {
     setError(null);
@@ -98,13 +159,16 @@ export function useOnboardingFlow() {
   }, []);
 
   /** Jumps directly to a step — e.g. an "Edit" link on the review step, skipping validation. */
-  const goToStep = useCallback((index: number) => {
-    setError(null);
-    setStepIndex(Math.min(Math.max(index, 0), ONBOARDING_STEPS.length - 1));
-  }, []);
+  const goToStep = useCallback(
+    (index: number) => {
+      setError(null);
+      setStepIndex(Math.min(Math.max(index, 0), steps.length - 1));
+    },
+    [steps.length],
+  );
 
   const finish = useCallback(async () => {
-    const validationError = validateStep(stepIndex, draft);
+    const validationError = validateStep(steps[stepIndex].key, draft);
     if (validationError) {
       setError(validationError);
       return null;
@@ -121,19 +185,24 @@ export function useOnboardingFlow() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [draft, stepIndex]);
+  }, [draft, stepIndex, steps]);
 
   return {
     draft,
+    steps,
     stepIndex,
-    step: ONBOARDING_STEPS[stepIndex],
-    totalSteps: ONBOARDING_STEPS.length,
+    step: steps[stepIndex],
+    totalSteps: steps.length,
     error,
     isHydrated,
     isSubmitting,
     isExistingClinic,
+    updateTemplateVersion,
     updateClinicBasics,
     updateDoctorProfile,
+    updateGymBasics,
+    updateTrainerProfile,
+    updateClassSetup,
     updateWorkingHoursDay,
     goNext,
     goBack,

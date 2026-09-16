@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAppointmentDetail } from "../hooks/use-appointment-detail";
 import { StatusBadge } from "./status-badge";
 import type { AppointmentStatus } from "../types";
+import { resolveTemplateByVersion } from "@/features/templates/registry";
 
 const ACTIVE_STATUSES: AppointmentStatus[] = ["booked", "arrived", "in_progress"];
 
@@ -29,7 +30,8 @@ function toDatetimeLocalValue(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function AppointmentDetailView({ id }: { id: string }) {
+export function AppointmentDetailView({ id, templateVersion }: { id: string; templateVersion: string }) {
+  const { labels } = resolveTemplateByVersion(templateVersion);
   const { appointment, isLoading, transition } = useAppointmentDetail(id);
   const [cancelReason, setCancelReason] = useState("");
   const [showReschedule, setShowReschedule] = useState(false);
@@ -63,7 +65,7 @@ export function AppointmentDetailView({ id }: { id: string }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl text-foreground">
-            {appointment.patient.name ?? "Unnamed patient"}
+            {appointment.patient.name ?? `Unnamed ${labels.customerSingular.toLowerCase()}`}
           </h1>
           <p className="mt-1 font-mono text-sm text-muted-foreground">{appointment.patient.phone}</p>
         </div>

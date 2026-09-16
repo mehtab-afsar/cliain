@@ -79,6 +79,7 @@ model Tenant {
   locations     Location[]
   resources     Resource[]
   offerings     Offering[]
+  sessions      Session[]
   bookings      Booking[]
   customers     Customer[]
   memberships   Membership[]
@@ -176,6 +177,7 @@ model Resource {
   attributes   Json           @default("{}")
   workingHours WorkingHours[]
   bookings     Booking[]
+  sessions     Session[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }
@@ -183,18 +185,58 @@ model Resource {
 // What customers book: a consultation, a class, a table. clinic-v1 only ever defines one
 // ("Consultation") per tenant today, but this replaces the hardcoded SLOT_DURATION_MINUTES
 // constant in availability-service.ts with a real per-tenant, per-offering value.
+// `mode` decides which booking engine path applies (see availability-service.ts /
+// appointment-service.ts): "appointment" is the existing one-resource-exclusive-per-slot path;
+// "class" books against a capacity-limited Session instead. Branching on this in engine code is
+// not a no-branching-rule violation — mode is a template-agnostic schema dimension shared by
+// every vertical (a cafe needs "reservation" too), unlike Tenant.vertical itself.
 model Offering {
-  id              String    @id @default(cuid())
+  id              String      @id @default(cuid())
   tenantId        String
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name            String
   durationMinutes Int
   resourceType    String
-  fields          Json      @default("{}")
-  active          Boolean   @default(true)
+  mode            BookingMode @default(appointment)
+  // Seeded onto every Session created for this offering unless overridden per-session. Only
+  // meaningful when mode = "class".
+  defaultCapacity Int?
+  fields          Json        @default("{}")
+  active          Boolean     @default(true)
   bookings        Booking[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  sessions        Session[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum SessionStatus {
+  scheduled
+  cancelled
+}
+
+// A generated class instance — "this Tuesday 6pm spin class, capacity 20." Only used by
+// class-mode offerings; appointment-mode bookings have no Session. Created directly today
+// (onboarding bulk-inserts a few weeks of rows from the chosen weekly slot) — there is no
+// recurring-timetable generator yet (PRD module M9), so a class stops appearing once its
+// bulk-created window runs out until that generator exists. See onboarding-repository.ts.
+model Session {
+  id         String        @id @default(cuid())
+  tenantId   String
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  offeringId String
+  offering   Offering      @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  resourceId String
+  resource   Resource      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  startAt    DateTime
+  endAt      DateTime
+  capacity   Int
+  status     SessionStatus @default(scheduled)
+  bookings   Booking[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([resourceId, startAt])
+  @@index([tenantId, startAt])
 }
 
 // One versioned JSON document per tenant — the AI system prompt renders from this at request
@@ -295,6 +337,10 @@ model Booking {
   resource                Resource      @relation(fields: [resourceId], references: [id])
   offeringId              String
   offering                Offering      @relation(fields: [offeringId], references: [id])
+  // Only set for mode = "class" bookings — which Session this booking's partySize counts
+  // against for capacity purposes (see writeIfCapacityAvailable in appointment-service.ts).
+  sessionId               String?
+  session                 Session?      @relation(fields: [sessionId], references: [id])
   mode                    BookingMode   @default(appointment)
   partySize               Int           @default(1)
   sourceChannel           String?
@@ -330,6 +376,7 @@ model Booking {
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, startAt])
   @@index([resourceId, startAt])
+  @@index([sessionId])
   @@index([customerId])
 }
 

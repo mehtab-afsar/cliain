@@ -9,21 +9,21 @@ type CancelAppointmentInput = { appointmentId: string };
 export const cancelAppointmentTool: ToolDefinition<CancelAppointmentInput> = {
   name: "cancel_appointment",
   description:
-    "Cancel one of the current patient's upcoming appointments. Use the id from get_patient's upcomingAppointments — ask which one if there's more than one.",
+    "Cancel one of the current {customer}'s upcoming {booking}s. Use the id from get_patient's upcomingAppointments — ask which one if there's more than one.",
   input_schema: {
     type: "object",
     properties: {
-      appointmentId: { type: "string", description: "The appointment id to cancel." },
+      appointmentId: { type: "string", description: "The {booking} id to cancel." },
     },
     required: ["appointmentId"],
   },
   async execute(input, context) {
     const patient = await getPatientByPhone(context.tenantId, context.patientPhone);
-    if (!patient) return { error: "No patient record found for this number." };
+    if (!patient) return { error: "No record found for this number." };
 
     const appointment = await db.booking.findUnique({ where: { id: input.appointmentId } });
     if (!appointment || appointment.customerId !== patient.id) {
-      return { error: "That appointment doesn't belong to this patient." };
+      return { error: "That booking doesn't belong to this caller." };
     }
 
     const cancelled = await cancelAppointment(context.tenantId, input.appointmentId, {

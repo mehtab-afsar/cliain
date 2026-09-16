@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getCurrentDoctor } from "@/lib/current-doctor";
 import {
-  createClinic,
+  createTenant,
   getOnboardingDraft,
-  updateClinic,
+  updateTenant,
 } from "@/features/onboarding/services/onboarding-repository";
 import type { OnboardingDraft } from "@/features/onboarding/types";
 
@@ -31,8 +31,8 @@ export async function POST(request: Request) {
   const current = await getCurrentDoctor();
 
   const saved = current
-    ? await updateClinic(current.doctorId, draft)
-    : (await createClinic(session.user.id, draft)).draft;
+    ? await updateTenant(current.doctorId, draft)
+    : (await createTenant(session.user.id, draft)).draft;
 
   return NextResponse.json({ draft: saved });
 }

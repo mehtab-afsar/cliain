@@ -118,5 +118,88 @@ export async function cleanupEvalTenant(tenantId: string): Promise<void> {
   // Customer, which would otherwise block Tenant's cascade delete from reaching Customer.
   await db.conversation.deleteMany({ where: { customer: { tenantId } } });
   await db.booking.deleteMany({ where: { tenantId } });
+  await db.session.deleteMany({ where: { tenantId } });
   await db.tenant.delete({ where: { id: tenantId } });
+}
+
+export type EvalGymTenantOptions = {
+  trainerName?: string;
+  trainerRole?: string;
+  languages?: string[];
+  escalationScript?: string;
+  classCapacity?: number;
+};
+
+/** gym-v1 fixture — separate from createEvalTenant (rather than one function branching on a
+ *  templateVersion param) so no application code ever reads Tenant.vertical/templateVersion
+ *  to pick behavior, including test fixtures — keeps the no-branching ESLint rule's intent
+ *  honest even though it doesn't technically scan test files. Same shape otherwise: one
+ *  tenant, one location, one trainer resource, one class-mode offering. */
+export async function createEvalGymTenant(options: EvalGymTenantOptions = {}) {
+  const tenant = await db.tenant.create({
+    data: {
+      clinicName: "Eval Gym",
+      vertical: "gym",
+      templateVersion: "gym-v1",
+      timezone: "UTC",
+      emergencyScript: options.escalationScript,
+    },
+  });
+  const location = await db.location.create({ data: { tenantId: tenant.id, timezone: "UTC" } });
+  const resource = await db.resource.create({
+    data: {
+      tenantId: tenant.id,
+      locationId: location.id,
+      type: "trainer",
+      name: options.trainerName ?? "Coach Eval",
+      title: options.trainerRole ?? "Head Coach",
+    },
+  });
+  const capacity = options.classCapacity ?? 12;
+  const offering = await db.offering.create({
+    data: {
+      tenantId: tenant.id,
+      name: "Group Class",
+      durationMinutes: 45,
+      resourceType: "trainer",
+      mode: "class",
+      defaultCapacity: capacity,
+    },
+  });
+  await db.workingHours.createMany({
+    data: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+      resourceId: resource.id,
+      dayOfWeek,
+      isOpen: true,
+      startTime: "06:00",
+      endTime: "21:00",
+    })),
+  });
+  if (options.languages) {
+    await db.clinicSettings.create({
+      data: { tenantId: tenant.id, data: { gym: { languages: options.languages } } },
+    });
+  }
+  return { tenant, resource, offering };
+}
+
+export type CreateEvalSessionInput = {
+  offeringId: string;
+  resourceId: string;
+  startAt: Date;
+  endAt: Date;
+  capacity: number;
+};
+
+export async function createEvalSession(tenantId: string, input: CreateEvalSessionInput) {
+  return db.session.create({
+    data: {
+      tenantId,
+      offeringId: input.offeringId,
+      resourceId: input.resourceId,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      capacity: input.capacity,
+    },
+  });
 }

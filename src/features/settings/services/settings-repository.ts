@@ -2,18 +2,18 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
-import { ClinicSettingsSchema, type ClinicSettingsData } from "../schema";
+import type { CommonSettingsData } from "@/features/templates/common-settings";
 
 /**
- * The one function every settings-reading call site uses — never a raw Prisma row. A thin,
- * stable-signature facade over the template-aware resolver (config-resolver.ts) so the many
- * existing callers here don't need to change: every tenant is on clinic-v1 today, so this cast
- * is exact, not a guess. A call site that also needs the resolved template (to build a system
- * prompt, e.g.) calls resolveTenantConfig() directly instead.
+ * The common-projection facade every vertical-agnostic settings-reading call site uses (the
+ * "not-connected" banner, escalate.ts, the Vapi integrations route) — never a raw Prisma row,
+ * and now a real, honestly-typed subset rather than a clinic-only cast: works for any template.
+ * A call site that needs the tenant's *exact* per-template shape (the Settings business-details
+ * tab, updateSetting below) calls resolveTenantConfig() directly instead.
  */
-export async function resolveSettings(tenantId: string): Promise<ClinicSettingsData> {
-  const { settings } = await resolveTenantConfig(tenantId);
-  return settings as ClinicSettingsData;
+export async function resolveSettings(tenantId: string): Promise<CommonSettingsData> {
+  const { commonSettings } = await resolveTenantConfig(tenantId);
+  return commonSettings;
 }
 
 function getPath(obj: unknown, path: string): unknown {
@@ -38,7 +38,7 @@ function setPath(obj: Record<string, unknown>, path: string, value: unknown): Re
 }
 
 function isNameField(field: string): boolean {
-  return field === "clinic.name" || field === "clinic.displayName" || /\.name$/.test(field);
+  return /\.(name|displayName)$/.test(field);
 }
 
 /** "mehtab" -> "Mehtab" — applied on save to every name-like field per the "capitalise proper nouns" rule. */
@@ -53,20 +53,22 @@ function titleCase(value: string): string {
 
 /**
  * The one write path for every setting — updates the document and appends a SettingsAudit row
- * in the same transaction, so there's never a setting change without an audit trail.
+ * in the same transaction, so there's never a setting change without an audit trail. Validates
+ * against the tenant's own template's overridesSchema (not a hardcoded ClinicSettingsSchema
+ * import), so this works for any template, not just clinic-v1.
  */
 export async function updateSetting(
   tenantId: string,
   field: string,
   value: unknown,
   actor: string,
-): Promise<ClinicSettingsData> {
-  const current = await resolveSettings(tenantId);
+): Promise<unknown> {
+  const { template, settings: current } = await resolveTenantConfig(tenantId);
   const oldValue = getPath(current, field);
   const normalizedValue = isNameField(field) && typeof value === "string" ? titleCase(value) : value;
 
-  const updated = setPath(current, field, normalizedValue);
-  const parsed = ClinicSettingsSchema.parse(updated);
+  const updated = setPath(current as Record<string, unknown>, field, normalizedValue);
+  const parsed = template.overridesSchema.parse(updated);
 
   await db.$transaction(async (tx) => {
     await tx.clinicSettings.upsert({

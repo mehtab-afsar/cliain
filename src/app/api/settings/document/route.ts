@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireCurrentDoctor } from "@/lib/current-doctor";
-import { resolveSettings, updateSetting } from "@/features/settings/services/settings-repository";
+import { updateSetting } from "@/features/settings/services/settings-repository";
+import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
 
+// The tenant's exact per-template settings document (doctors array and all) — the Settings
+// business-details tab needs the real shape to edit, not the common cross-template projection
+// resolveSettings() returns.
 export async function GET() {
   const { doctorId } = await requireCurrentDoctor();
-  const settings = await resolveSettings(doctorId);
+  const { settings } = await resolveTenantConfig(doctorId);
   return NextResponse.json(settings);
 }
 

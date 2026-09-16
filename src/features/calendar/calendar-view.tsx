@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/features/dashboard-shell/components/empty-state";
 import { PageHeader } from "@/features/dashboard-shell/components/page-header";
 import { useAppointments, StatusBadge, type AppointmentStatus } from "@/features/appointments";
+import { resolveTemplateByVersion } from "@/features/templates/registry";
 import {
   buildMonthGrid,
   dayKey,
@@ -31,7 +32,8 @@ const STATUS_DOT: Record<AppointmentStatus, string> = {
 
 const MAX_CHIPS_PER_DAY = 3;
 
-export function CalendarView() {
+export function CalendarView({ templateVersion }: { templateVersion: string }) {
+  const { labels } = resolveTemplateByVersion(templateVersion);
   const { appointments, isLoading } = useAppointments();
   const [monthAnchor, setMonthAnchor] = useState(() => new Date());
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function CalendarView() {
       <EmptyState
         icon={CalendarRange}
         title="Your calendar will appear here"
-        description="Once appointments start coming in, they'll sync here and to your connected Google Calendar."
+        description={`Once ${labels.bookingPlural.toLowerCase()} start coming in, they'll sync here and to your connected Google Calendar.`}
       />
     );
   }
@@ -159,7 +161,7 @@ export function CalendarView() {
                     </span>
                     <div>
                       <p className="font-medium text-foreground">
-                        {appointment.patient.name ?? "Unnamed patient"}
+                        {appointment.patient.name ?? `Unnamed ${labels.customerSingular.toLowerCase()}`}
                       </p>
                       <p className="text-xs text-muted-foreground">{appointment.reason ?? "No reason given"}</p>
                     </div>

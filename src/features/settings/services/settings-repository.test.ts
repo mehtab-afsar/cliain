@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resolveSettings, updateSetting, listRecentAudit } from "./settings-repository";
+import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
+import type { ClinicSettingsData } from "../schema";
 
 async function createDoctor(overrides: Partial<Parameters<typeof db.tenant.create>[0]["data"]> = {}) {
   const doctor = await db.tenant.create({
@@ -25,7 +27,7 @@ async function cleanup(doctorId: string) {
   await db.tenant.delete({ where: { id: doctorId } });
 }
 
-describe("resolveSettings", () => {
+describe("resolveSettings (common projection)", () => {
   let doctorId: string | undefined;
 
   afterEach(async () => {
@@ -39,11 +41,11 @@ describe("resolveSettings", () => {
 
     const settings = await resolveSettings(doctor.id);
 
-    expect(settings.clinic.name).toBe("Test Clinic");
-    expect(settings.doctors[0].name).toBe("Mehtab");
-    expect(settings.doctors[0].title).toBe("Dr.");
-    // The exact backfill case: Tenant.emergencyScript migrates into safety.emergencyScript.
-    expect(settings.safety.emergencyScript).toBe("Call 108 immediately.");
+    expect(settings.business.name).toBe("Test Clinic");
+    expect(settings.primaryResource.name).toBe("Mehtab");
+    expect(settings.primaryResource.title).toBe("Dr.");
+    // The exact backfill case: Tenant.emergencyScript migrates into safety.escalationScript.
+    expect(settings.safety.escalationScript).toBe("Call 108 immediately.");
     expect(settings.safety.escalationWhatsappNumber).toBe("+15550001111");
     expect(settings.messaging.tone).toBe("friendly");
     expect(settings.messaging.disclosureEnabled).toBe(true);
@@ -62,7 +64,7 @@ describe("resolveSettings", () => {
 
     expect(settings.messaging.tone).toBe("formal");
     expect(settings.messaging.disclosureEnabled).toBe(true); // still the default
-    expect(settings.clinic.name).toBe("Test Clinic"); // still from the Tenant row
+    expect(settings.business.name).toBe("Test Clinic"); // still from the Tenant row
   });
 });
 
@@ -78,11 +80,11 @@ describe("updateSetting", () => {
     const doctor = await createDoctor();
     doctorId = doctor.id;
 
-    const updated = await updateSetting(doctor.id, "messaging.tone", "neutral", "staff:u1");
+    const updated = (await updateSetting(doctor.id, "messaging.tone", "neutral", "staff:u1")) as ClinicSettingsData;
     expect(updated.messaging.tone).toBe("neutral");
 
-    const reread = await resolveSettings(doctor.id);
-    expect(reread.messaging.tone).toBe("neutral");
+    const { settings: reread } = await resolveTenantConfig(doctor.id);
+    expect((reread as ClinicSettingsData).messaging.tone).toBe("neutral");
 
     const audit = await listRecentAudit(doctor.id, "messaging.");
     expect(audit).toHaveLength(1);
@@ -95,7 +97,12 @@ describe("updateSetting", () => {
     const doctor = await createDoctor();
     doctorId = doctor.id;
 
-    const updated = await updateSetting(doctor.id, "clinic.name", "mehtab family clinic", "staff:u1");
+    const updated = (await updateSetting(
+      doctor.id,
+      "clinic.name",
+      "mehtab family clinic",
+      "staff:u1",
+    )) as ClinicSettingsData;
     expect(updated.clinic.name).toBe("Mehtab Family Clinic");
   });
 

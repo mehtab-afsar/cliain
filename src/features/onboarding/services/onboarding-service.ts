@@ -1,3 +1,4 @@
+import { gymV1Template } from "@/features/templates/gym-v1";
 import { WEEKDAY_LABELS, type OnboardingDraft, type WorkingHoursDay } from "../types";
 
 const STORAGE_KEY = "cliain:onboarding-draft";
@@ -22,8 +23,18 @@ function defaultTimezone(): string {
 
 export function createEmptyDraft(): OnboardingDraft {
   return {
+    templateVersion: "clinic-v1",
     clinicBasics: { clinicName: "", timezone: defaultTimezone() },
     doctorProfile: { doctorName: "", specialty: "", whatsappNumber: "" },
+    gymBasics: { gymName: "", timezone: defaultTimezone() },
+    trainerProfile: { trainerName: "", role: "", whatsappNumber: "" },
+    classSetup: {
+      className: gymV1Template.defaultOffering.name,
+      durationMinutes: gymV1Template.defaultOffering.durationMinutes,
+      capacity: gymV1Template.defaultOffering.defaultCapacity ?? 12,
+      dayOfWeek: 1,
+      startTime: "18:00",
+    },
     workingHours: defaultWorkingHours(),
     completedAt: null,
   };

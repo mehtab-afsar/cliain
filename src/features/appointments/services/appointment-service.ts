@@ -4,8 +4,12 @@ import { Prisma, type Booking, type BookingStatus } from "@prisma/client";
 import { resolveTimezone } from "@/lib/timezone";
 import { getTenantById, getPrimaryResourceForTenant, getPrimaryOfferingForTenant } from "./doctor-repository";
 import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, getBusyIntervals } from "./calendar-sync";
+import { resolveTemplateForTenant } from "@/features/templates/registry";
 
 const SLOT_TAKEN_MESSAGE = "That slot was just booked by someone else — please choose another time.";
+const SESSION_FULL_MESSAGE = "That class is full — please choose another time.";
+const SESSION_REQUIRED_MESSAGE = "This offering is booked by class session — a sessionId is required.";
+const SESSION_NOT_APPLICABLE_MESSAGE = "This offering doesn't use class sessions — omit sessionId.";
 
 /**
  * A best-effort guard against a slot that's free in Postgres but blocked directly on the
@@ -124,6 +128,68 @@ async function writeIfSlotFree<T>(
   }
 }
 
+/** Internal marker distinguishing "the capacity check itself failed" (genuinely full — no
+ *  point retrying) from a raw Postgres serialization conflict (see writeIfCapacityAvailable). */
+class CapacityFullError extends Error {}
+
+const MAX_CAPACITY_RETRY_ATTEMPTS = 5;
+
+/**
+ * The class-mode analog of writeIfSlotFree, with one real difference: unlike an exclusive slot
+ * (where a conflict means the slot truly is taken, so surfacing "pick another time" immediately
+ * is correct), a capacity conflict here doesn't mean the class is full — it means this
+ * transaction merely lost the race to be *validated* first. Several people can legitimately fit
+ * in the same session, so a plain single-shot Serializable transaction under N-way concurrent
+ * load (e.g. several members replying to "last spots left!" at once) would let only the first
+ * committer through and falsely reject everyone else, even with room to spare — confirmed
+ * empirically, not just in theory (a 4-way-concurrent test against capacity 3 let exactly 1
+ * through with a single-shot attempt). Retrying on a genuine serialization conflict — which
+ * re-reads the now-current booked count — fixes this: each retry either finds real room and
+ * succeeds, or correctly finds the class actually full and stops. Bounded so a class that's
+ * truly at capacity still fails fast instead of retrying pointlessly.
+ */
+async function writeIfCapacityAvailable<T>(
+  sessionId: string,
+  partySize: number,
+  write: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 1; attempt <= MAX_CAPACITY_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await db.$transaction(
+        async (tx) => {
+          const session = await tx.session.findUniqueOrThrow({ where: { id: sessionId } });
+          const agg = await tx.booking.aggregate({
+            where: { sessionId, status: "booked" },
+            _sum: { partySize: true },
+          });
+          const bookedSoFar = agg._sum.partySize ?? 0;
+          if (bookedSoFar + partySize > session.capacity) {
+            throw new CapacityFullError();
+          }
+          return write(tx);
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (error instanceof CapacityFullError) {
+        throw new Error(SESSION_FULL_MESSAGE);
+      }
+      if (isSerializationFailure(error) && attempt < MAX_CAPACITY_RETRY_ATTEMPTS) {
+        continue;
+      }
+      if (isSerializationFailure(error)) {
+        // Exhausted retries under very heavy contention — treat as full rather than hang the
+        // conversation turn indefinitely; the customer sees the same friendly message either way.
+        throw new Error(SESSION_FULL_MESSAGE);
+      }
+      throw error;
+    }
+  }
+  // Unreachable (the loop always returns or throws), but keeps TypeScript's control-flow
+  // analysis happy without an explicit non-null assertion at every call site.
+  throw new Error(SESSION_FULL_MESSAGE);
+}
+
 /** A plain status transition that doesn't touch startAt/endAt — arrived, completed, no-show, cancel. */
 async function transitionStatus(
   tenantId: string,
@@ -159,16 +225,37 @@ export type BookAppointmentInput = {
   startAt: string; // ISO, UTC
   endAt: string; // ISO, UTC
   reason?: string;
+  // Class-mode only (see bookClassSession below) — which Session to book into, and how many
+  // people this booking covers (defaults to 1).
+  sessionId?: string;
+  partySize?: number;
 };
 
+/**
+ * Dispatches on the tenant's offering mode — appointment-mode keeps the exact exclusive-slot
+ * path below unchanged; class-mode delegates to bookClassSession's capacity-aware path. This
+ * is a booking-mode branch, not a vertical branch (see the no-branching rule's actual scope in
+ * eslint.config.mjs) — every template can offer either mode.
+ */
 export async function bookAppointment(
   tenantId: string,
   input: BookAppointmentInput,
   by: Actor,
 ): Promise<Booking> {
+  const offering = await getPrimaryOfferingForTenant(tenantId);
+
+  if (offering.mode === "class") {
+    if (!input.sessionId) throw new Error(SESSION_REQUIRED_MESSAGE);
+    return bookClassSession(
+      tenantId,
+      { patientId: input.patientId, sessionId: input.sessionId, partySize: input.partySize ?? 1, reason: input.reason },
+      by,
+    );
+  }
+  if (input.sessionId) throw new Error(SESSION_NOT_APPLICABLE_MESSAGE);
+
   const tenant = await getTenantById(tenantId);
   const resource = await getPrimaryResourceForTenant(tenantId);
-  const offering = await getPrimaryOfferingForTenant(tenantId);
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 
@@ -200,11 +287,12 @@ export async function bookAppointment(
   });
 
   if (tenant.googleCalendarId) {
+    const template = resolveTemplateForTenant(tenant);
     const sync = await createCalendarEvent({
       tenantId: tenant.id,
       calendarId: tenant.googleCalendarId,
       bookingId: booking.id,
-      summary: `${customer.name ?? "Patient"} — ${resource.name}`,
+      summary: `${customer.name ?? template.labels.customerSingular} — ${resource.name}`,
       description: input.reason,
       startAt,
       endAt,
@@ -219,6 +307,55 @@ export async function bookAppointment(
   }
 
   return booking;
+}
+
+export type BookClassSessionInput = {
+  patientId: string;
+  sessionId: string;
+  partySize: number;
+  reason?: string;
+};
+
+/**
+ * Books `partySize` spots into an existing class Session — never Google-Calendar-synced (a
+ * shared class isn't one customer's exclusive calendar event the way an appointment is).
+ */
+export async function bookClassSession(
+  tenantId: string,
+  input: BookClassSessionInput,
+  by: Actor,
+): Promise<Booking> {
+  if (input.partySize < 1) throw new Error("partySize must be at least 1.");
+
+  const tenant = await getTenantById(tenantId);
+  const session = await db.session.findFirstOrThrow({ where: { id: input.sessionId, tenantId: tenant.id } });
+  await db.customer.findFirstOrThrow({ where: { id: input.patientId, tenantId: tenant.id } });
+
+  return writeIfCapacityAvailable(session.id, input.partySize, async (tx) => {
+    const created = await tx.booking.create({
+      data: {
+        tenantId: tenant.id,
+        customerId: input.patientId,
+        resourceId: session.resourceId,
+        offeringId: session.offeringId,
+        sessionId: session.id,
+        mode: "class",
+        partySize: input.partySize,
+        startAt: session.startAt,
+        endAt: session.endAt,
+        reason: input.reason,
+        status: "booked",
+      },
+    });
+    await writeEvent(tx, {
+      bookingId: created.id,
+      tenantId: tenant.id,
+      fromStatus: null,
+      toStatus: "booked",
+      by,
+    });
+    return created;
+  });
 }
 
 export async function cancelAppointment(
@@ -300,6 +437,12 @@ export async function rescheduleAppointment(
   const existing = await db.booking.findFirstOrThrow({
     where: { id: input.appointmentId, tenantId: tenant.id },
   });
+  // Moving a member from one class Session to another is a different operation (a capacity
+  // check against the target session, not an exclusive-slot check) and isn't built yet —
+  // fail loudly rather than silently run the exclusive-slot path against a class booking.
+  if (existing.mode === "class") {
+    throw new Error("Rescheduling a class booking isn't supported yet — cancel and rebook into a different session.");
+  }
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 

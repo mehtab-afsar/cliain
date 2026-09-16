@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/features/dashboard-shell/components/page-header";
 import { useAppointments, StatusBadge } from "@/features/appointments";
 import { TEST_PATIENT_PHONE } from "@/features/ai-agent/test-patient";
+import { resolveTemplateByVersion } from "@/features/templates/registry";
 import { useTestAssistant } from "./hooks/use-test-assistant";
 import { isVoiceModeSupported, useVoiceMode } from "./hooks/use-voice-mode";
 
@@ -23,7 +24,8 @@ function formatTime(iso: string): string {
   });
 }
 
-export function TestAssistantView() {
+export function TestAssistantView({ templateVersion }: { templateVersion: string }) {
+  const { labels } = resolveTemplateByVersion(templateVersion);
   const { messages, sending, error, send, reset } = useTestAssistant();
   const { appointments } = useAppointments();
   const [mode, setMode] = useState<Mode>("message");
@@ -69,7 +71,7 @@ export function TestAssistantView() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Try it out"
-        description="Talk to your own AI assistant exactly like a patient would — no WhatsApp number, no Meta App, no phone call needed to test it."
+        description={`Talk to your own AI assistant exactly like a ${labels.customerSingular.toLowerCase()} would — no WhatsApp number, no Meta App, no phone call needed to test it.`}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
@@ -108,9 +110,11 @@ export function TestAssistantView() {
             {messages.length === 0 ? (
               <p className="m-auto max-w-xs text-center text-sm text-muted-foreground">
                 {mode === "message"
-                  ? "Type as a patient would — \"Hi, can I get an appointment tomorrow afternoon?\""
+                  ? `Type as a ${labels.customerSingular.toLowerCase()} would — "Hi, can I get ${
+                      /^[aeiou]/i.test(labels.bookingSingular) ? "an" : "a"
+                    } ${labels.bookingSingular.toLowerCase()} tomorrow afternoon?"`
                   : voiceSupported
-                    ? "Tap the mic and talk as a patient would."
+                    ? `Tap the mic and talk as a ${labels.customerSingular.toLowerCase()} would.`
                     : "Voice mode needs Chrome or Edge — switch to Message above."}
               </p>
             ) : (
@@ -191,7 +195,9 @@ export function TestAssistantView() {
           </div>
 
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
-            <h3 className="text-sm font-medium text-foreground">Test patient&apos;s bookings</h3>
+            <h3 className="text-sm font-medium text-foreground">
+              Test {labels.customerSingular.toLowerCase()}&apos;s bookings
+            </h3>
             {testAppointments.length === 0 ? (
               <p className="text-xs text-muted-foreground">Nothing booked yet this session.</p>
             ) : (

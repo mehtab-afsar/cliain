@@ -1,53 +1,41 @@
 "use client";
 
-import { Building2, ClipboardCheck, Clock, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useOnboardingFlow } from "./hooks/use-onboarding-flow";
+import { getDraftTemplateVersion } from "./step-registry";
 import { OnboardingLayout } from "./components/onboarding-layout";
 import { OnboardingPreview } from "./components/onboarding-preview";
+import { TemplateSelectStep } from "./components/template-select-step";
 import { ClinicBasicsStep } from "./components/clinic-basics-step";
 import { DoctorProfileStep } from "./components/doctor-profile-step";
+import { GymBasicsStep } from "./components/gym-basics-step";
+import { TrainerProfileStep } from "./components/trainer-profile-step";
 import { WorkingHoursStep } from "./components/working-hours-step";
+import { ClassSetupStep } from "./components/class-setup-step";
 import { ReviewStep } from "./components/review-step";
 
-const STEP_META = [
-  {
-    label: "Clinic",
-    icon: Building2,
-    title: "Tell us about your clinic",
-    description: "This is what patients will see when Cliain messages them.",
-  },
-  {
-    label: "Doctor",
-    icon: UserRound,
-    title: "Who's this scheduler for?",
-    description: "Add the doctor patients will be booking with.",
-  },
-  {
-    label: "Hours",
-    icon: Clock,
-    title: "Set your working hours",
-    description: "Cliain only offers slots inside these hours.",
-  },
-  {
-    label: "Review",
-    icon: ClipboardCheck,
-    title: "Review and finish",
-    description: "Double-check everything, then Cliain is ready to start answering for you.",
-  },
-];
+const EMPTY_CLINIC_BASICS = { clinicName: "", timezone: "" };
+const EMPTY_DOCTOR_PROFILE = { doctorName: "", specialty: "", whatsappNumber: "" };
+const EMPTY_GYM_BASICS = { gymName: "", timezone: "" };
+const EMPTY_TRAINER_PROFILE = { trainerName: "", role: "", whatsappNumber: "" };
+const EMPTY_CLASS_SETUP = { className: "", durationMinutes: 45, capacity: 12, dayOfWeek: 1, startTime: "18:00" };
 
 export function OnboardingView() {
   const router = useRouter();
   const {
     draft,
+    steps,
     stepIndex,
     totalSteps,
     error,
     isHydrated,
     isSubmitting,
+    updateTemplateVersion,
     updateClinicBasics,
     updateDoctorProfile,
+    updateGymBasics,
+    updateTrainerProfile,
+    updateClassSetup,
     updateWorkingHoursDay,
     goNext,
     goBack,
@@ -58,7 +46,7 @@ export function OnboardingView() {
   if (!isHydrated) return null;
 
   const isLastStep = stepIndex === totalSteps - 1;
-  const copy = STEP_META[stepIndex];
+  const step = steps[stepIndex];
 
   async function handleNext() {
     if (isLastStep) {
@@ -72,9 +60,9 @@ export function OnboardingView() {
   return (
     <OnboardingLayout
       stepIndex={stepIndex}
-      steps={STEP_META}
-      title={copy.title}
-      description={copy.description}
+      steps={steps}
+      title={step.title}
+      description={step.description}
       error={error}
       onBack={goBack}
       onNext={handleNext}
@@ -82,21 +70,30 @@ export function OnboardingView() {
       isLastStep={isLastStep}
       isNextDisabled={isSubmitting}
       nextLabel={isLastStep && isSubmitting ? "Saving…" : undefined}
-      preview={<OnboardingPreview draft={draft} stepIndex={stepIndex} />}
+      preview={<OnboardingPreview draft={draft} step={step} />}
     >
-      {stepIndex === 0 ? (
-        <ClinicBasicsStep value={draft.clinicBasics} onChange={updateClinicBasics} />
+      {step.key === "template-select" ? (
+        <TemplateSelectStep value={getDraftTemplateVersion(draft)} onChange={updateTemplateVersion} />
       ) : null}
-      {stepIndex === 1 ? (
-        <DoctorProfileStep value={draft.doctorProfile} onChange={updateDoctorProfile} />
+      {step.key === "clinic-basics" ? (
+        <ClinicBasicsStep value={draft.clinicBasics ?? EMPTY_CLINIC_BASICS} onChange={updateClinicBasics} />
       ) : null}
-      {stepIndex === 2 ? (
-        <WorkingHoursStep
-          value={draft.workingHours}
-          onChangeDay={updateWorkingHoursDay}
-        />
+      {step.key === "doctor-profile" ? (
+        <DoctorProfileStep value={draft.doctorProfile ?? EMPTY_DOCTOR_PROFILE} onChange={updateDoctorProfile} />
       ) : null}
-      {stepIndex === 3 ? <ReviewStep draft={draft} onEditStep={goToStep} /> : null}
+      {step.key === "gym-basics" ? (
+        <GymBasicsStep value={draft.gymBasics ?? EMPTY_GYM_BASICS} onChange={updateGymBasics} />
+      ) : null}
+      {step.key === "trainer-profile" ? (
+        <TrainerProfileStep value={draft.trainerProfile ?? EMPTY_TRAINER_PROFILE} onChange={updateTrainerProfile} />
+      ) : null}
+      {step.key === "working-hours" ? (
+        <WorkingHoursStep value={draft.workingHours} onChangeDay={updateWorkingHoursDay} />
+      ) : null}
+      {step.key === "class-setup" ? (
+        <ClassSetupStep value={draft.classSetup ?? EMPTY_CLASS_SETUP} onChange={updateClassSetup} />
+      ) : null}
+      {step.key === "review" ? <ReviewStep draft={draft} onEditStep={goToStep} /> : null}
     </OnboardingLayout>
   );
 }

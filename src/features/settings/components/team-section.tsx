@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { useTeam } from "../hooks/use-team";
+import type { TemplateContent } from "@/features/templates/types";
 
-export function TeamSection() {
+export function TeamSection({ labels }: { labels: TemplateContent["labels"] }) {
   const { members, invitations, isCreating, error, invite, revoke } = useTeam();
 
   return (
@@ -11,7 +12,8 @@ export function TeamSection() {
       <div>
         <h2 className="font-heading text-lg text-foreground">Team</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Invite staff to share this clinic&apos;s patients and appointments.
+          Invite staff to share this {labels.businessNoun.toLowerCase()}&apos;s {labels.customerPlural.toLowerCase()} and{" "}
+          {labels.bookingPlural.toLowerCase()}.
         </p>
       </div>
 

@@ -6,7 +6,7 @@ import type { ToolDefinition } from "./types";
 export const getPatientTool: ToolDefinition<Record<string, never>> = {
   name: "get_patient",
   description:
-    "Look up the current patient's record and their upcoming booked appointments, by their WhatsApp phone number.",
+    "Look up the current {customer}'s record and their upcoming booked {booking}s, by their WhatsApp phone number.",
   input_schema: { type: "object", properties: {} },
   async execute(_input, context) {
     const patient = await getPatientByPhone(context.tenantId, context.patientPhone);

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./status-badge";
 import type { AppointmentListItem, AppointmentStatus } from "../types";
 import type { TransitionInput } from "../services/appointment-client";
+import type { TemplateContent } from "@/features/templates/types";
 
 const ACTIVE_STATUSES: AppointmentStatus[] = ["booked", "arrived", "in_progress"];
 
@@ -94,15 +95,16 @@ type TableProps = {
   showActions: boolean;
   onTransition: (id: string, input: TransitionInput) => void;
   timeOnly?: boolean;
+  labels: TemplateContent["labels"];
 };
 
-function AppointmentTable({ appointments, showActions, onTransition, timeOnly }: TableProps) {
+function AppointmentTable({ appointments, showActions, onTransition, timeOnly, labels }: TableProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
-            <th className="px-4 py-3 font-medium">Patient</th>
+            <th className="px-4 py-3 font-medium">{labels.customerSingular}</th>
             <th className="px-4 py-3 font-medium">When</th>
             <th className="px-4 py-3 font-medium">Reason</th>
             <th className="px-4 py-3 font-medium">Status</th>
@@ -115,7 +117,7 @@ function AppointmentTable({ appointments, showActions, onTransition, timeOnly }:
               <td className="px-4 py-3">
                 <Link href={`/dashboard/appointments/${appointment.id}`} className="hover:underline">
                   <p className="font-medium text-foreground">
-                    {appointment.patient.name ?? "Unnamed patient"}
+                    {appointment.patient.name ?? `Unnamed ${labels.customerSingular.toLowerCase()}`}
                   </p>
                   <p className="font-mono text-xs text-muted-foreground">{appointment.patient.phone}</p>
                 </Link>
@@ -143,9 +145,10 @@ function AppointmentTable({ appointments, showActions, onTransition, timeOnly }:
 type AppointmentListProps = {
   appointments: AppointmentListItem[];
   onTransition: (id: string, input: TransitionInput) => void;
+  labels: TemplateContent["labels"];
 };
 
-export function AppointmentList({ appointments, onTransition }: AppointmentListProps) {
+export function AppointmentList({ appointments, onTransition, labels }: AppointmentListProps) {
   const today = appointments.filter((appointment) => isToday(appointment.startAt));
   const rest = appointments.filter((appointment) => !isToday(appointment.startAt));
 
@@ -159,6 +162,7 @@ export function AppointmentList({ appointments, onTransition }: AppointmentListP
             showActions
             onTransition={onTransition}
             timeOnly
+            labels={labels}
           />
         </div>
       ) : null}
@@ -166,7 +170,7 @@ export function AppointmentList({ appointments, onTransition }: AppointmentListP
       {rest.length > 0 ? (
         <div className="flex flex-col gap-3">
           {today.length > 0 ? <h2 className="font-heading text-lg text-foreground">Upcoming</h2> : null}
-          <AppointmentTable appointments={rest} showActions={false} onTransition={onTransition} />
+          <AppointmentTable appointments={rest} showActions={false} onTransition={onTransition} labels={labels} />
         </div>
       ) : null}
     </div>

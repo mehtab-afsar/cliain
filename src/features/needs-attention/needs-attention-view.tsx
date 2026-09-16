@@ -3,10 +3,12 @@
 import { ShieldCheck } from "lucide-react";
 import { EmptyState } from "@/features/dashboard-shell/components/empty-state";
 import { PageHeader } from "@/features/dashboard-shell/components/page-header";
+import { resolveTemplateByVersion } from "@/features/templates/registry";
 import { useNeedsAttention } from "./hooks/use-needs-attention";
 import { NeedsAttentionList } from "./components/needs-attention-list";
 
-export function NeedsAttentionView() {
+export function NeedsAttentionView({ templateVersion }: { templateVersion: string }) {
+  const { labels } = resolveTemplateByVersion(templateVersion);
   const { patients, isLoading, clear } = useNeedsAttention();
 
   if (isLoading) return null;
@@ -27,7 +29,7 @@ export function NeedsAttentionView() {
         title="Needs attention"
         description="Conversations the AI has handed off to your team. The AI stays silent on these until you clear them."
       />
-      <NeedsAttentionList patients={patients} onClear={clear} />
+      <NeedsAttentionList patients={patients} onClear={clear} labels={labels} />
     </div>
   );
 }

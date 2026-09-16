@@ -11,13 +11,13 @@ type CheckAvailabilityInput = {
 export const checkAvailabilityTool: ToolDefinition<CheckAvailabilityInput> = {
   name: "check_availability",
   description:
-    "Check the doctor's open appointment slots on a given date, optionally narrowed to a time-of-day range. Always call this before offering times to a patient.",
+    "Check the {resource}'s open {booking} slots on a given date, optionally narrowed to a time-of-day range. Always call this before offering times to a {customer}.",
   input_schema: {
     type: "object",
     properties: {
       date: {
         type: "string",
-        description: "ISO date (YYYY-MM-DD), local to the clinic's timezone.",
+        description: "ISO date (YYYY-MM-DD), local to the {resource}'s timezone.",
       },
       earliestTime: {
         type: "string",

@@ -35,7 +35,8 @@ export const ClinicSettingsSchema = z.object({
     escalationWhatsappNumber: z.string().optional(),
   }),
   messaging: z.object({
-    /** Template; `{clinic}` is interpolated. Falls back to a computed default when empty. */
+    /** Template; `{business}`/`{resource}` are interpolated (see templates/prompt-render.ts).
+     *  Falls back to the template's own defaultGreeting when empty. */
     greeting: z.string().optional(),
     tone: z.enum(["friendly", "neutral", "formal"]).default("friendly"),
     disclosureEnabled: z.boolean().default(true),
@@ -44,5 +45,3 @@ export const ClinicSettingsSchema = z.object({
 
 export type ClinicSettingsData = z.infer<typeof ClinicSettingsSchema>;
 export type DoctorTitle = z.infer<typeof DoctorTitleSchema>;
-
-export const DEFAULT_GREETING = "Hi! This is {clinic}. I can help you book an appointment.";

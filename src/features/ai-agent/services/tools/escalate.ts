@@ -13,7 +13,7 @@ type EscalateInput = {
 export const escalateTool: ToolDefinition<EscalateInput> = {
   name: "escalate",
   description:
-    "Hand this conversation off to clinic staff and stop automated replies until they've reviewed it. Call this for a medical emergency (after delivering the clinic's emergency guidance as your reply), when the patient explicitly asks for a human, or when you're unable to help after a couple of attempts.",
+    "Hand this conversation off to staff and stop automated replies until they've reviewed it. Call this for an emergency (after delivering the exact emergency guidance as your reply), when the {customer} explicitly asks for a human, or when you're unable to help after a couple of attempts.",
   input_schema: {
     type: "object",
     properties: {
@@ -28,7 +28,7 @@ export const escalateTool: ToolDefinition<EscalateInput> = {
   },
   async execute(input, context) {
     const patient = await getPatientByPhone(context.tenantId, context.patientPhone);
-    if (!patient) return { ok: false, error: "No patient record to escalate." };
+    if (!patient) return { ok: false, error: "No record found to escalate." };
 
     await db.customer.update({
       where: { id: patient.id },

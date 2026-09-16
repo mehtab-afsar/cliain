@@ -1,4 +1,5 @@
 import type { TemplateFallbackSource } from "../types";
+import type { CommonSettingsData } from "../common-settings";
 import type { ClinicSettingsData } from "@/features/settings/schema";
 
 export function buildFallback(source: TemplateFallbackSource): ClinicSettingsData {
@@ -46,5 +47,32 @@ export function mergeOverrides(
     doctors: stored.doctors && stored.doctors.length > 0 ? stored.doctors : fallback.doctors,
     safety: { ...fallback.safety, ...stored.safety },
     messaging: { ...fallback.messaging, ...stored.messaging },
+  };
+}
+
+export function toCommonSettings(data: ClinicSettingsData): CommonSettingsData {
+  const doctor = data.doctors[0];
+  return {
+    business: {
+      name: data.clinic.name,
+      displayName: data.clinic.displayName,
+      address: data.clinic.address,
+      languages: data.clinic.languages,
+      phoneShownToCustomers: data.clinic.phoneShownToPatients,
+    },
+    primaryResource: {
+      title: doctor && doctor.title !== "none" ? doctor.title : undefined,
+      name: doctor?.name ?? data.clinic.name,
+      subtitle: doctor?.specialty,
+    },
+    safety: {
+      escalationScript: data.safety.emergencyScript,
+      escalationWhatsappNumber: data.safety.escalationWhatsappNumber,
+    },
+    messaging: {
+      greeting: data.messaging.greeting,
+      tone: data.messaging.tone,
+      disclosureEnabled: data.messaging.disclosureEnabled,
+    },
   };
 }

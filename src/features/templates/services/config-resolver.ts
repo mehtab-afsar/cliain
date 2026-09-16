@@ -3,12 +3,14 @@ import { db } from "@/lib/db";
 import { getPrimaryResourceForTenant } from "@/features/appointments/services/doctor-repository";
 import { resolveTemplate } from "../registry";
 import type { TemplateDefinition } from "../types";
+import type { CommonSettingsData } from "../common-settings";
 
 export type ResolvedTenantConfig = {
   tenant: Awaited<ReturnType<typeof db.tenant.findUniqueOrThrow>>;
   resource: Awaited<ReturnType<typeof getPrimaryResourceForTenant>>;
   template: TemplateDefinition;
   settings: unknown;
+  commonSettings: CommonSettingsData;
 };
 
 /**
@@ -30,6 +32,7 @@ export async function resolveTenantConfig(tenantId: string): Promise<ResolvedTen
   const stored = tenant.settings?.data as Partial<unknown> | undefined;
   const merged = template.mergeOverrides(fallback, stored);
   const settings = template.overridesSchema.parse(merged);
+  const commonSettings = template.toCommonSettings(settings);
 
-  return { tenant, resource, template, settings };
+  return { tenant, resource, template, settings, commonSettings };
 }

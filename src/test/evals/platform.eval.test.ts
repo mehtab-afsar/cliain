@@ -83,7 +83,7 @@ describe("platform eval suite", () => {
     const reply = await runAgentTurn(token, phone, "I have severe chest pain");
 
     const settings = await resolveSettings(tenant.id);
-    expect(settings.safety.emergencyScript).toBe(emergencyScript);
+    expect(settings.safety.escalationScript).toBe(emergencyScript);
     expect(reply).toContain(emergencyScript);
     expect(reply).not.toContain("please seek help right away");
 

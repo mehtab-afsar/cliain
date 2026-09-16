@@ -1,22 +1,31 @@
 "use client";
 
-import { useClinicSettings } from "../hooks/use-clinic-settings";
+import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { SettingsSelectField } from "./settings-select-field";
 import { SettingsToggleField } from "./settings-toggle-field";
 import { SettingsAuditTrail } from "./settings-audit-trail";
 import { MessagingPreview } from "./messaging-preview";
-import { DEFAULT_GREETING } from "../schema";
+import { resolveTemplateByVersion } from "@/features/templates/registry";
 
-const TONE_OPTIONS = [
-  { value: "friendly", label: "Friendly" },
-  { value: "neutral", label: "Neutral" },
-  { value: "formal", label: "Formal" },
-];
+/** `messaging.*` itself is identical in shape across every template's overridesSchema — only
+ *  the valid `tone` values (from `template.toneStyle`'s keys) and the greeting default differ,
+ *  both read off `template` below. */
+type SharedMessagingSettings = {
+  messaging: { greeting?: string; tone: string; disclosureEnabled: boolean };
+};
 
-export function MessagingTab() {
-  const { settings, reload } = useClinicSettings();
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export function MessagingTab({ templateVersion }: { templateVersion: string }) {
+  const template = resolveTemplateByVersion(templateVersion);
+  const { settings, reload } = useTenantSettings<SharedMessagingSettings>();
   if (!settings) return null;
+
+  const toneOptions = Object.keys(template.toneStyle).map((value) => ({ value, label: capitalize(value) }));
+  const { customerSingular } = template.labels;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
@@ -27,20 +36,20 @@ export function MessagingTab() {
           multiline
           initialValue={settings.messaging.greeting ?? ""}
           defaultValue=""
-          placeholder={DEFAULT_GREETING}
-          help="Variables: {clinic}, {doctor}."
+          placeholder={template.defaultGreeting}
+          help="Variables: {business}, {resource}."
           onSaved={reload}
         />
         <SettingsSelectField
           field="messaging.tone"
           label="Tone"
           initialValue={settings.messaging.tone}
-          options={TONE_OPTIONS}
+          options={toneOptions}
           onSaved={reload}
         />
         <SettingsToggleField
           field="messaging.disclosureEnabled"
-          label="Tell patients they're talking to an automated assistant"
+          label={`Tell ${customerSingular.toLowerCase()}s they're talking to an automated assistant`}
           initialValue={settings.messaging.disclosureEnabled}
           help="Recommended to keep this on."
           onSaved={reload}
@@ -48,7 +57,7 @@ export function MessagingTab() {
         <SettingsAuditTrail fieldPrefix="messaging." />
       </div>
 
-      <MessagingPreview settings={settings} />
+      <MessagingPreview template={template} settings={settings} />
     </div>
   );
 }

@@ -4,12 +4,14 @@ import { cn } from "@/lib/utils";
 import { useSidebarState } from "../hooks/use-sidebar-state";
 import { SidebarBody } from "./sidebar-body";
 import { CollapseToggle } from "./collapse-toggle";
+import type { TemplateContent } from "@/features/templates/types";
 
 type SidebarProps = {
   clinicName?: string;
+  labels: TemplateContent["labels"];
 };
 
-export function Sidebar({ clinicName }: SidebarProps) {
+export function Sidebar({ clinicName, labels }: SidebarProps) {
   const { isCollapsed, isHovering, setHovering, toggle } = useSidebarState();
 
   // Pinned open — renders exactly as a normal in-flow panel, same as before this existed.
@@ -18,7 +20,7 @@ export function Sidebar({ clinicName }: SidebarProps) {
     return (
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-sidebar shadow-elevation-sm transition-[width] duration-200 md:flex">
         <div className="flex-1 overflow-y-auto">
-          <SidebarBody isCollapsed={false} clinicName={clinicName} />
+          <SidebarBody isCollapsed={false} clinicName={clinicName} labels={labels} />
         </div>
         <div className="flex justify-end border-t border-border p-2">
           <CollapseToggle isCollapsed={false} onToggle={toggle} />
@@ -43,7 +45,7 @@ export function Sidebar({ clinicName }: SidebarProps) {
         )}
       >
         <div className="flex-1 overflow-y-auto">
-          <SidebarBody isCollapsed={!expanded} clinicName={clinicName} />
+          <SidebarBody isCollapsed={!expanded} clinicName={clinicName} labels={labels} />
         </div>
         <div
           className={cn(

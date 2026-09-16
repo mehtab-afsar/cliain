@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useClinicSettings } from "../hooks/use-clinic-settings";
+import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { LanguageChipsField } from "./language-chips-field";
 import { SettingsAuditTrail } from "./settings-audit-trail";
+import type { ClinicSettingsData } from "../schema";
 
 export function ClinicTab() {
-  const { settings, reload } = useClinicSettings();
+  const { settings, reload } = useTenantSettings<ClinicSettingsData>();
   if (!settings) return null;
 
   const doctorName = settings.doctors[0]?.name?.trim().toLowerCase();

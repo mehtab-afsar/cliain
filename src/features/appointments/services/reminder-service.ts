@@ -5,14 +5,21 @@ import { sendWhatsappTemplate } from "@/features/ai-agent/services/whatsapp-clie
 import { placeOutboundCall } from "@/features/ai-agent/services/vapi-client";
 import { getVapiConfig } from "@/lib/integration-credentials";
 import { resolveTimezone } from "@/lib/timezone";
+import { resolveTemplateForTenant } from "@/features/templates/registry";
 
 // Text goes out further ahead as a heads-up; a call goes out closer to the appointment as a
-// stronger nudge (and lets the patient reschedule/cancel by voice on the spot). Both are
+// stronger nudge (and lets the customer reschedule/cancel by voice on the spot). Both are
 // independently gated on their own credentials being configured — either can be added or
 // removed by flipping `voiceCall` here, no other code changes needed.
+//
+// `template` picks the tenant's own template's `whatsappReminderTemplates.h24`/`.h2` (a Meta-
+// approved WhatsApp template NAME, not the message body itself — Meta template bodies are fixed
+// text approved ahead of time; this code only fills in `{{1}}..{{4}}` placeholders). Every
+// vertical needs its own approved template before reminders will actually send for it — see
+// TemplateContent.whatsappReminderTemplates's doc comment.
 const REMINDER_WINDOWS = [
-  { field: "reminder24hSentAt", hoursBefore: 24, template: "appointment_reminder_24h", voiceCall: false },
-  { field: "reminder2hSentAt", hoursBefore: 2, template: "appointment_reminder_2h", voiceCall: true },
+  { field: "reminder24hSentAt", hoursBefore: 24, templateKey: "h24", voiceCall: false },
+  { field: "reminder2hSentAt", hoursBefore: 2, templateKey: "h2", voiceCall: true },
 ] as const;
 
 const WINDOW_SLACK_MINUTES = 5;
@@ -37,6 +44,8 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
     });
 
     for (const booking of dueBookings) {
+      const template = resolveTemplateForTenant(booking.tenant);
+      const templateName = template.whatsappReminderTemplates[window.templateKey];
       const local = DateTime.fromJSDate(booking.startAt, {
         zone: resolveTimezone(booking.resource.location.timezone ?? booking.tenant.timezone),
       });
@@ -45,7 +54,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
       let anySucceeded = false;
 
       try {
-        await sendWhatsappTemplate(booking.tenantId, booking.customer.phone, window.template, "en_US", [
+        await sendWhatsappTemplate(booking.tenantId, booking.customer.phone, templateName, "en_US", [
           booking.customer.name ?? "there",
           booking.resource.name,
           dateLabel,
@@ -54,7 +63,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
         anySucceeded = true;
       } catch (error) {
         console.error(
-          `[reminder-service] Failed to send ${window.template} for booking ${booking.id}:`,
+          `[reminder-service] Failed to send ${templateName} for booking ${booking.id}:`,
           error,
         );
       }
@@ -65,7 +74,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
           doctor: booking.tenant,
           toPhone: booking.customer.phone,
           patientName: booking.customer.name,
-          callPurpose: `to confirm your appointment on ${dateLabel} at ${timeLabel}`,
+          callPurpose: `to confirm your ${template.terms.booking} on ${dateLabel} at ${timeLabel}`,
         });
         if (call.ok) {
           anySucceeded = true;
@@ -79,7 +88,7 @@ export async function sendDueReminders(): Promise<{ sent: number; failed: number
 
       // Mark sent if at least one channel got through — never retry a channel that already
       // succeeded just because another failed (a broken WhatsApp template shouldn't cause the
-      // patient to get called again every 5 minutes).
+      // customer to get called again every 5 minutes).
       if (anySucceeded) {
         await db.booking.update({
           where: { id: booking.id },

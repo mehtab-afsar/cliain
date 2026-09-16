@@ -9,6 +9,7 @@ import { IntegrationHelp, WHATSAPP_HELP } from "./integration-help";
 import { RemindersExplainer } from "./reminders-explainer";
 import { VapiStatusCard } from "./vapi-status-card";
 import { GoogleCalendarStatusCard } from "./google-calendar-status-card";
+import type { TemplateContent } from "@/features/templates/types";
 
 /** Reads the `?googleCalendar=connected|cancelled|error` the OAuth callback redirects back
  *  with, shows it once, then strips it from the URL so a refresh doesn't repeat it. */
@@ -28,19 +29,22 @@ function useGoogleCalendarOAuthBanner() {
   return banner;
 }
 
-export function IntegrationsSection() {
+export function IntegrationsSection({ labels }: { labels: TemplateContent["labels"] }) {
   const { status, savingProvider, errorByProvider, save, disconnect, enablePhoneCalls, disablePhoneCalls } =
     useIntegrations();
   const googleCalendarBanner = useGoogleCalendarOAuthBanner();
 
   if (!status) return null;
 
+  const customers = labels.customerPlural.toLowerCase();
+  const business = labels.businessNoun.toLowerCase();
+
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h2 className="font-heading text-lg text-foreground">Integrations</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect the channels Cliain uses to talk to your patients.
+          Connect the channels Cliain uses to talk to your {customers}.
         </p>
       </div>
 
@@ -60,7 +64,7 @@ export function IntegrationsSection() {
 
       <IntegrationCard
         title="WhatsApp"
-        description="Lets patients text your clinic and get booked by Cliain."
+        description={`Lets ${customers} text your ${business} and get booked by Cliain.`}
         connected={status.whatsapp.connected}
         isSaving={savingProvider === "whatsapp"}
         error={errorByProvider.whatsapp}

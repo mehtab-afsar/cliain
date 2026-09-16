@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { runTool } from "@/features/ai-agent/services/tools";
 import { buildInboundAssistantConfig } from "@/features/ai-agent/services/vapi-client";
-import { getTenantById } from "@/features/appointments/services/doctor-repository";
 import { resolveTenantConfig } from "@/features/templates/services/config-resolver";
-import type { ClinicSettingsData } from "@/features/settings/schema";
 import { getVapiWebhookSecret } from "@/lib/integration-credentials";
 import { mintToolToken } from "@/features/ai-agent/services/tool-token";
 import { vapiPublicUrl } from "@/lib/env";
@@ -67,12 +65,13 @@ export async function POST(request: Request, { params }: RouteParams) {
     return new NextResponse("Too many requests", { status: 429 });
   }
 
-  let doctor;
+  let resolved;
   try {
-    doctor = await getTenantById(doctorId);
+    resolved = await resolveTenantConfig(doctorId);
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }
+  const { tenant: doctor, template, commonSettings: settings } = resolved;
 
   // A webhook secret is required to connect Vapi at all (see saveIntegrationCredentials), so
   // this only stays unverified for clinics that connected before that requirement existed —
@@ -113,8 +112,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       if (!publicUrl) {
         return NextResponse.json({ error: "No URL Vapi can reach is configured." }, { status: 500 });
       }
-      const { template, settings: rawSettings } = await resolveTenantConfig(doctorId);
-      const settings = rawSettings as ClinicSettingsData;
       const assistant = buildInboundAssistantConfig(
         template,
         doctor,
@@ -145,7 +142,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       toolCalls.map(async (call) => {
         try {
           const result = await withTimeout(
-            runTool(call.name, call.arguments, toolToken, patientPhone),
+            runTool(call.name, call.arguments, toolToken, patientPhone, template.terms),
             TOOL_CALL_TIMEOUT_MS,
           );
           return { toolCallId: call.id, result: JSON.stringify(result) };

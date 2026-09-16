@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { mintToolToken } from "../tool-token";
 import { runTool } from "./index";
+import { clinicV1Template } from "@/features/templates/clinic-v1";
+
+const TERMS = clinicV1Template.terms;
 
 async function createDoctorAndPatient() {
   const doctor = await db.tenant.create({ data: { timezone: "UTC" } });
@@ -33,7 +36,7 @@ describe("escalate + runTool", () => {
     doctorId = doctor.id;
     const token = mintToolToken({ tenantId: doctor.id, channel: "whatsapp" });
 
-    await runTool("escalate", { reason: "emergency", note: "chest pain" }, token, patient.phone);
+    await runTool("escalate", { reason: "emergency", note: "chest pain" }, token, patient.phone, TERMS);
 
     const updated = await db.customer.findUniqueOrThrow({ where: { id: patient.id } });
     expect(updated.needsHumanReview).toBe(true);
@@ -46,11 +49,11 @@ describe("escalate + runTool", () => {
     doctorId = doctor.id;
     const token = mintToolToken({ tenantId: doctor.id, channel: "voice" });
 
-    await runTool("escalate", { reason: "patient_requested" }, token, patient.phone);
+    await runTool("escalate", { reason: "patient_requested" }, token, patient.phone, TERMS);
 
-    const result = (await runTool("get_patient", {}, token, patient.phone)) as { error?: string };
+    const result = (await runTool("get_patient", {}, token, patient.phone, TERMS)) as { error?: string };
 
-    expect(result.error).toContain("handed off to clinic staff");
+    expect(result.error).toContain("handed off to staff");
   });
 
   it("still lets escalate itself run again once already escalated", async () => {
@@ -58,13 +61,14 @@ describe("escalate + runTool", () => {
     doctorId = doctor.id;
     const token = mintToolToken({ tenantId: doctor.id, channel: "whatsapp" });
 
-    await runTool("escalate", { reason: "unresolved" }, token, patient.phone);
+    await runTool("escalate", { reason: "unresolved" }, token, patient.phone, TERMS);
 
     const second = (await runTool(
       "escalate",
       { reason: "emergency", note: "escalated again" },
       token,
       patient.phone,
+      TERMS,
     )) as { ok?: boolean };
 
     expect(second.ok).toBe(true);

@@ -1,6 +1,6 @@
-import type { ClinicSettingsData } from "../schema";
-
-export async function fetchClinicSettings(): Promise<ClinicSettingsData | null> {
+/** `T` is trusted to match whichever template's overridesSchema the current tenant is on
+ *  (ClinicSettingsData, GymSettingsData, ...) — this is a thin fetch wrapper, not a validator. */
+export async function fetchSettingsDocument<T>(): Promise<T | null> {
   const response = await fetch("/api/settings/document");
   if (!response.ok) return null;
   return response.json();

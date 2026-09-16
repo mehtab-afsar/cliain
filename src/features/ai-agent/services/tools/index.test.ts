@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { mintToolToken } from "../tool-token";
 import { runTool } from "./index";
+import { clinicV1Template } from "@/features/templates/clinic-v1";
 
 const SHARED_PHONE = `+1555${Date.now()}${Math.floor(Math.random() * 1000)}`;
+const TERMS = clinicV1Template.terms;
 
 async function createTenantWithCustomer(name: string) {
   const tenant = await db.tenant.create({ data: { timezone: "UTC" } });
@@ -41,7 +43,7 @@ describe("runTool — Tool Gateway tenant binding", () => {
 
     const tokenA = mintToolToken({ tenantId: tenantA.id, channel: "whatsapp" });
 
-    const result = (await runTool("get_patient", {}, tokenA, SHARED_PHONE)) as {
+    const result = (await runTool("get_patient", {}, tokenA, SHARED_PHONE, TERMS)) as {
       patient: { id: string; name: string | null } | null;
     };
 
@@ -53,7 +55,7 @@ describe("runTool — Tool Gateway tenant binding", () => {
     const { tenant: tenantA } = await createTenantWithCustomer("Alice");
     tenantAId = tenantA.id;
 
-    const result = await runTool("get_patient", {}, "not-a-real-token", SHARED_PHONE);
+    const result = await runTool("get_patient", {}, "not-a-real-token", SHARED_PHONE, TERMS);
     expect(result).toEqual({ error: "Invalid or expired session." });
   });
 
@@ -66,7 +68,7 @@ describe("runTool — Tool Gateway tenant binding", () => {
     tenantAId = tenantA.id;
 
     const tokenA = mintToolToken({ tenantId: tenantA.id, channel: "whatsapp" });
-    const result = (await runTool("get_patient", {}, tokenA, SHARED_PHONE)) as {
+    const result = (await runTool("get_patient", {}, tokenA, SHARED_PHONE, TERMS)) as {
       patient: { id: string } | null;
     };
     expect(result.patient?.id).toBe(customerA.id);

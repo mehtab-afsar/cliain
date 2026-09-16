@@ -11,12 +11,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { SidebarBody } from "./sidebar-body";
+import type { TemplateContent } from "@/features/templates/types";
 
 type MobileSidebarProps = {
   clinicName?: string;
+  labels: TemplateContent["labels"];
 };
 
-export function MobileSidebar({ clinicName }: MobileSidebarProps) {
+export function MobileSidebar({ clinicName, labels }: MobileSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -35,6 +37,7 @@ export function MobileSidebar({ clinicName }: MobileSidebarProps) {
         <SidebarBody
           isCollapsed={false}
           clinicName={clinicName}
+          labels={labels}
           onNavigate={() => setIsOpen(false)}
         />
       </SheetContent>

@@ -1,15 +1,18 @@
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/features/landing/components/logo-mark";
-import { NAV_ITEMS } from "./nav-items";
+import { buildNavItems } from "./nav-items";
 import { SidebarNavItem } from "./sidebar-nav-item";
+import type { TemplateContent } from "@/features/templates/types";
 
 type SidebarBodyProps = {
   isCollapsed: boolean;
   clinicName?: string;
+  labels: TemplateContent["labels"];
   onNavigate?: () => void;
 };
 
-export function SidebarBody({ isCollapsed, clinicName, onNavigate }: SidebarBodyProps) {
+export function SidebarBody({ isCollapsed, clinicName, labels, onNavigate }: SidebarBodyProps) {
+  const navItems = buildNavItems(labels);
   return (
     <div className="flex h-full flex-col gap-6 px-3 py-5">
       <div className={cn("px-2", isCollapsed && "flex justify-center px-0")}>
@@ -22,7 +25,7 @@ export function SidebarBody({ isCollapsed, clinicName, onNavigate }: SidebarBody
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <SidebarNavItem
             key={item.href}
             item={item}
