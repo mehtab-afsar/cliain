@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatTime } from "../services/format-time";
 
@@ -15,6 +18,7 @@ type TimeSelectProps = {
 
 /** A Select-based time picker in 15-minute increments — replaces native <input type="time">, which renders inconsistently across browsers. */
 export function TimeSelect({ id, value, onChange }: TimeSelectProps) {
+  const t = useTranslations("Onboarding.fields");
   return (
     <Select
       value={value}
@@ -23,7 +27,7 @@ export function TimeSelect({ id, value, onChange }: TimeSelectProps) {
       }}
     >
       <SelectTrigger id={id} className="w-28">
-        <SelectValue placeholder="Select a time" />
+        <SelectValue placeholder={t("selectTimePlaceholder")} />
       </SelectTrigger>
       <SelectContent>
         {TIME_OPTIONS.map((time) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useOnboardingFlow } from "./hooks/use-onboarding-flow";
 import { getDraftTemplateVersion } from "./step-registry";
 import { OnboardingLayout } from "./components/onboarding-layout";
@@ -22,6 +23,7 @@ const EMPTY_CLASS_SETUP = { className: "", durationMinutes: 45, capacity: 12, da
 
 export function OnboardingView() {
   const router = useRouter();
+  const tCommon = useTranslations("Common");
   const {
     draft,
     steps,
@@ -69,7 +71,7 @@ export function OnboardingView() {
       isFirstStep={stepIndex === 0}
       isLastStep={isLastStep}
       isNextDisabled={isSubmitting}
-      nextLabel={isLastStep && isSubmitting ? "Saving…" : undefined}
+      nextLabel={isLastStep && isSubmitting ? tCommon("saving") : undefined}
       preview={<OnboardingPreview draft={draft} step={step} />}
     >
       {step.key === "template-select" ? (

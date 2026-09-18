@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Switch } from "@/components/ui/switch";
 import type { WorkingHoursDay } from "../types";
 import { TimeSelect } from "./time-select";
@@ -8,6 +11,7 @@ type WorkingHoursDayRowProps = {
 };
 
 export function WorkingHoursDayRow({ day, onChange }: WorkingHoursDayRowProps) {
+  const t = useTranslations("Onboarding.fields");
   return (
     <div className="flex items-center gap-4 py-3">
       <div className="flex w-32 items-center gap-3">
@@ -22,11 +26,11 @@ export function WorkingHoursDayRow({ day, onChange }: WorkingHoursDayRowProps) {
       {day.isOpen ? (
         <div className="flex flex-1 items-center gap-2">
           <TimeSelect value={day.startTime} onChange={(startTime) => onChange({ startTime })} />
-          <span className="text-sm text-muted-foreground">to</span>
+          <span className="text-sm text-muted-foreground">{t("to")}</span>
           <TimeSelect value={day.endTime} onChange={(endTime) => onChange({ endTime })} />
         </div>
       ) : (
-        <p className="flex-1 text-sm text-muted-foreground">Closed</p>
+        <p className="flex-1 text-sm text-muted-foreground">{t("closed")}</p>
       )}
     </div>
   );

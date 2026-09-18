@@ -1,4 +1,7 @@
+"use client";
+
 import { Building2, Dumbbell } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 type TemplateOption = {
@@ -8,30 +11,31 @@ type TemplateOption = {
   icon: typeof Building2;
 };
 
-const OPTIONS: TemplateOption[] = [
-  {
-    value: "clinic-v1",
-    label: "Clinic",
-    description: "Book patient appointments with a doctor or practitioner.",
-    icon: Building2,
-  },
-  {
-    value: "gym-v1",
-    label: "Gym",
-    description: "Book members into a recurring class with a trainer.",
-    icon: Dumbbell,
-  },
-];
-
 type TemplateSelectStepProps = {
   value: string;
   onChange: (templateVersion: string) => void;
 };
 
 export function TemplateSelectStep({ value, onChange }: TemplateSelectStepProps) {
+  const t = useTranslations("Onboarding.templateSelect");
+  const options: TemplateOption[] = [
+    {
+      value: "clinic-v1",
+      label: t("clinicLabel"),
+      description: t("clinicDescription"),
+      icon: Building2,
+    },
+    {
+      value: "gym-v1",
+      label: t("gymLabel"),
+      description: t("gymDescription"),
+      icon: Dumbbell,
+    },
+  ];
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {OPTIONS.map((option) => {
+      {options.map((option) => {
         const Icon = option.icon;
         const selected = value === option.value;
         return (

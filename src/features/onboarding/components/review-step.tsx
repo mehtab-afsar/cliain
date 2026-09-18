@@ -1,5 +1,8 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { OnboardingDraft } from "../types";
 import { formatTime } from "../services/format-time";
 import { WEEKDAY_LABELS } from "../types";
@@ -19,6 +22,7 @@ type SectionProps = {
 };
 
 function Section({ title, stepIndex, onEditStep, children }: SectionProps) {
+  const tCommon = useTranslations("Common");
   return (
     <section className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
       <div>
@@ -32,7 +36,7 @@ function Section({ title, stepIndex, onEditStep, children }: SectionProps) {
           className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <Pencil className="h-3 w-3" />
-          Edit
+          {tCommon("edit")}
         </button>
       ) : null}
     </section>
@@ -52,18 +56,19 @@ export function ReviewStep({ draft, onEditStep }: ReviewStepProps) {
   const steps = getOnboardingSteps(getDraftTemplateVersion(draft));
   const stepIndexOf = (key: string) => steps.findIndex((step) => step.key === key);
   const gym = isGymDraft(draft);
+  const t = useTranslations("Onboarding.review");
 
   return (
     <div className="divide-y divide-border">
       {gym ? (
-        <Section title="Gym" stepIndex={stepIndexOf("gym-basics")} onEditStep={onEditStep}>
+        <Section title={t("gym")} stepIndex={stepIndexOf("gym-basics")} onEditStep={onEditStep}>
           <p className="mt-1 font-heading text-lg text-foreground">
             {draft.gymBasics?.gymName || "—"}
           </p>
           <p className="text-sm text-muted-foreground">{draft.gymBasics?.timezone}</p>
         </Section>
       ) : (
-        <Section title="Clinic" stepIndex={stepIndexOf("clinic-basics")} onEditStep={onEditStep}>
+        <Section title={t("clinic")} stepIndex={stepIndexOf("clinic-basics")} onEditStep={onEditStep}>
           <p className="mt-1 font-heading text-lg text-foreground">
             {draft.clinicBasics?.clinicName || "—"}
           </p>
@@ -72,32 +77,32 @@ export function ReviewStep({ draft, onEditStep }: ReviewStepProps) {
       )}
 
       {gym ? (
-        <Section title="Trainer" stepIndex={stepIndexOf("trainer-profile")} onEditStep={onEditStep}>
+        <Section title={t("trainer")} stepIndex={stepIndexOf("trainer-profile")} onEditStep={onEditStep}>
           <p className="mt-1 font-heading text-lg text-foreground">
             {draft.trainerProfile?.trainerName || "—"}
           </p>
           <p className="text-sm text-muted-foreground">
-            {draft.trainerProfile?.role || "No role set"}
+            {draft.trainerProfile?.role || t("noRoleSet")}
             {draft.trainerProfile?.whatsappNumber
               ? ` · ${draft.trainerProfile.whatsappNumber}`
-              : " · WhatsApp not connected yet"}
+              : ` · ${t("whatsappNotConnected")}`}
           </p>
         </Section>
       ) : (
-        <Section title="Doctor" stepIndex={stepIndexOf("doctor-profile")} onEditStep={onEditStep}>
+        <Section title={t("doctor")} stepIndex={stepIndexOf("doctor-profile")} onEditStep={onEditStep}>
           <p className="mt-1 font-heading text-lg text-foreground">
             {draft.doctorProfile?.doctorName || "—"}
           </p>
           <p className="text-sm text-muted-foreground">
-            {draft.doctorProfile?.specialty || "No specialty set"}
+            {draft.doctorProfile?.specialty || t("noSpecialtySet")}
             {draft.doctorProfile?.whatsappNumber
               ? ` · ${draft.doctorProfile.whatsappNumber}`
-              : " · WhatsApp not connected yet"}
+              : ` · ${t("whatsappNotConnected")}`}
           </p>
         </Section>
       )}
 
-      <Section title="Working hours" stepIndex={stepIndexOf("working-hours")} onEditStep={onEditStep}>
+      <Section title={t("workingHours")} stepIndex={stepIndexOf("working-hours")} onEditStep={onEditStep}>
         <ul className="mt-2 flex flex-col gap-1">
           {openDays.map((day) => (
             <li key={day.dayOfWeek} className="flex justify-between gap-6 text-sm text-foreground">
@@ -111,7 +116,7 @@ export function ReviewStep({ draft, onEditStep }: ReviewStepProps) {
       </Section>
 
       {gym && draft.classSetup ? (
-        <Section title="Class" stepIndex={stepIndexOf("class-setup")} onEditStep={onEditStep}>
+        <Section title={t("classSection")} stepIndex={stepIndexOf("class-setup")} onEditStep={onEditStep}>
           <p className="mt-1 font-heading text-lg text-foreground">{draft.classSetup.className || "—"}</p>
           <p className="text-sm text-muted-foreground">
             {WEEKDAY_LABELS[draft.classSetup.dayOfWeek]}s at {formatTime(draft.classSetup.startTime)} ·{" "}

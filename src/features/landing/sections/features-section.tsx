@@ -6,7 +6,7 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: MessageSquare,
     title: "WhatsApp and phone, same result",
-    body: "Patients pick the channel. Either way they get the same availability, the same booking, the same confirmation.",
+    body: "Customers pick the channel. Either way they get the same availability, the same booking, the same confirmation.",
   },
   {
     icon: Calendar,
@@ -16,11 +16,11 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: CheckCircle2,
     title: "No double bookings, ever",
-    body: "A slot is checked against existing appointments before it's offered, and again before it's confirmed.",
+    body: "A slot is checked against existing bookings before it's offered, and again before it's confirmed.",
   },
   {
     icon: User,
-    title: "Your patient list builds itself",
+    title: "Your customer list builds itself",
     body: "Anyone who messages or calls appears in your dashboard with their history, even if they haven't booked yet.",
   },
 ];
@@ -32,7 +32,7 @@ export function FeaturesSection() {
         <h2
           className={`max-w-[18ch] text-[clamp(30px,3.6vw,44px)] leading-[1.08] font-medium tracking-[-0.03em] ${HEADING_FONT}`}
         >
-          Built around how a small clinic actually runs.
+          Built around how a small clinic or gym actually runs.
         </h2>
 
         <div className="mt-14 grid grid-cols-1 gap-x-16 min-[760px]:grid-cols-2">

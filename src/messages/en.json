@@ -1,0 +1,253 @@
+{
+  "Common": {
+    "settings": "Settings",
+    "back": "Back",
+    "continue": "Continue",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved ✓",
+    "creating": "Creating…",
+    "edit": "Edit",
+    "copy": "Copy",
+    "revoke": "Revoke",
+    "select": "Select…",
+    "resetToDefault": "Reset to default",
+    "signOut": "Sign out"
+  },
+  "DashboardShell": {
+    "nav": {
+      "overview": "Overview",
+      "tryItOut": "Try it out",
+      "needsAttention": "Needs attention",
+      "calendar": "Calendar",
+      "settings": "Settings"
+    },
+    "mobileSidebar": {
+      "openNavigation": "Open navigation",
+      "navigationTitle": "Navigation",
+      "navigationDescription": "Cliain dashboard navigation"
+    },
+    "collapseToggle": {
+      "expand": "Expand sidebar",
+      "collapse": "Collapse sidebar"
+    },
+    "notConnectedBanner": {
+      "message": "Cliain isn't answering yet.",
+      "cta": "Connect WhatsApp",
+      "suffix": "to go live.",
+      "dismiss": "Dismiss"
+    },
+    "languageSwitcher": {
+      "label": "Switch language"
+    }
+  },
+  "Settings": {
+    "layout": {
+      "title": "Settings",
+      "description": "The control surface for what Cliain says and does."
+    },
+    "tabs": {
+      "messaging": "Messaging",
+      "safety": "Safety",
+      "integrations": "Integrations",
+      "team": "Team",
+      "billing": "Billing"
+    },
+    "clinic": {
+      "sameNameWarning": "Your clinic and your doctor have the same name. Patients will see both; is that right?",
+      "nameLabel": "Clinic name",
+      "nameHelp": "Shown to patients when Cliain messages them.",
+      "displayNameLabel": "Display name (optional)",
+      "displayNameHelp": "If patients should see a different name than the clinic name above.",
+      "addressLabel": "Address",
+      "addressHelp": "The AI uses this to answer 'where are you?'",
+      "phoneLabel": "Phone number shown to patients",
+      "languagesLabel": "Languages patients use",
+      "languagesHelp": "Drives the language the AI replies in.",
+      "editProfilePrefix": "Need to change your doctor's profile or working hours?",
+      "editProfileCta": "Go through setup again"
+    },
+    "gym": {
+      "sameNameWarning": "Your gym and your trainer have the same name. Members will see both; is that right?",
+      "nameLabel": "Gym name",
+      "nameHelp": "Shown to members when Cliain messages them.",
+      "displayNameLabel": "Display name (optional)",
+      "displayNameHelp": "If members should see a different name than the gym name above.",
+      "addressLabel": "Address",
+      "addressHelp": "The AI uses this to answer 'where are you?'",
+      "phoneLabel": "Phone number shown to members",
+      "languagesLabel": "Languages members use",
+      "languagesHelp": "Drives the language the AI replies in.",
+      "editProfilePrefix": "Need to change your trainer's profile, class, or working hours?",
+      "editProfileCta": "Go through setup again"
+    },
+    "messaging": {
+      "greetingLabel": "Greeting",
+      "greetingHelp": "Variables: '{business}', '{resource}'.",
+      "toneLabel": "Tone",
+      "disclosureLabel": "Tell {customerPlural} they're talking to an automated assistant",
+      "disclosureHelp": "Recommended to keep this on."
+    },
+    "safety": {
+      "intro": "Who the AI hands a conversation off to, and what it says on a possible emergency.",
+      "escalationLabel": "Escalation WhatsApp number",
+      "escalationPlaceholder": "Staff number to alert on a handoff",
+      "escalationHelp": "They'll get a message for emergencies and anything the AI can't handle.",
+      "scriptLabel": "Emergency guidance",
+      "scriptHelp": "Sent word-for-word on a possible emergency — not paraphrased by the AI."
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connect the channels Cliain uses to talk to your {customers}.",
+      "googleCalendarConnected": "Google Calendar connected — new bookings will start mirroring over.",
+      "googleCalendarError": "Couldn't connect Google Calendar — try again below.",
+      "whatsappDescription": "Lets {customers} text your {business} and get booked by Cliain.",
+      "webhookUrlLabel": "Webhook URL — paste into your Meta App's WhatsApp product",
+      "phoneNumberIdLabel": "Phone number ID",
+      "phoneNumberIdPlaceholder": "From your Meta App's WhatsApp product",
+      "accessTokenLabel": "Access token",
+      "verifyTokenLabel": "Webhook verify token",
+      "verifyTokenPlaceholder": "Any secret string you choose",
+      "appSecretLabel": "App secret",
+      "appSecretPlaceholder": "Required — verifies requests came from Meta",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "advanced": "Advanced",
+      "webhookUrlMissing": "Set APP_URL in your deployment to see this clinic's webhook URL.",
+      "copyWebhookUrl": "Copy webhook URL",
+      "disconnect": "Disconnect",
+      "secretUnchangedPlaceholder": "•••••••• (unchanged)"
+    },
+    "team": {
+      "title": "Team",
+      "description": "Invite staff to share this {business}'s {customers} and {bookings}.",
+      "pendingInvites": "Pending invites",
+      "inviteButton": "Invite staff member",
+      "inviteFailed": "Failed to create invite link."
+    },
+    "auditTrail": {
+      "title": "Recent changes"
+    }
+  },
+  "Onboarding": {
+    "layout": {
+      "stepProgress": "Step {current} of {total}",
+      "finishSetup": "Finish setup"
+    },
+    "fields": {
+      "timezoneLabel": "Timezone",
+      "selectTimezonePlaceholder": "Select a timezone",
+      "whatsappNumberLabel": "WhatsApp number",
+      "whatsappHelp": "Don't have this yet? Leave it blank — you can connect WhatsApp later from Settings.",
+      "selectTimePlaceholder": "Select a time",
+      "dayPlaceholder": "Day",
+      "at": "at",
+      "to": "to",
+      "closed": "Closed"
+    },
+    "templateSelect": {
+      "clinicLabel": "Clinic",
+      "clinicDescription": "Book patient appointments with a doctor or practitioner.",
+      "gymLabel": "Gym",
+      "gymDescription": "Book members into a recurring class with a trainer."
+    },
+    "clinicBasics": {
+      "nameLabel": "Clinic name"
+    },
+    "doctorProfile": {
+      "nameLabel": "Doctor name",
+      "specialtyLabel": "Specialty"
+    },
+    "gymBasics": {
+      "nameLabel": "Gym name"
+    },
+    "trainerProfile": {
+      "nameLabel": "Trainer name",
+      "roleLabel": "Role"
+    },
+    "classSetup": {
+      "nameLabel": "Class name",
+      "durationLabel": "Duration (minutes)",
+      "capacityLabel": "Capacity",
+      "recursLabel": "When it recurs",
+      "help": "Cliain books this class every week for the next few weeks — you can add more from the dashboard later."
+    },
+    "preview": {
+      "viaWhatsapp": "via WhatsApp",
+      "confirmed": "Confirmed",
+      "caption": "A live preview of what your customers will see"
+    },
+    "review": {
+      "gym": "Gym",
+      "clinic": "Clinic",
+      "trainer": "Trainer",
+      "doctor": "Doctor",
+      "workingHours": "Working hours",
+      "classSection": "Class",
+      "noRoleSet": "No role set",
+      "noSpecialtySet": "No specialty set",
+      "whatsappNotConnected": "WhatsApp not connected yet"
+    },
+    "validation": {
+      "clinicName": "Enter your clinic's name.",
+      "timezone": "Select a timezone.",
+      "doctorName": "Enter the doctor's name.",
+      "gymName": "Enter your gym's name.",
+      "trainerName": "Enter the trainer's name.",
+      "className": "Enter a class name.",
+      "classDuration": "Enter a class duration.",
+      "classCapacity": "Enter a class capacity.",
+      "openDay": "Open at least one day of the week.",
+      "closingTimeAfterOpening": "{day}'s closing time must be after opening time.",
+      "saveFailed": "Couldn't save your setup — check your connection and try again."
+    }
+  },
+  "Analytics": {
+    "overview": {
+      "title": "Overview",
+      "description": "How your {business} is doing — response times, {bookings}, and what needs your attention.",
+      "bookingsThisWeekLabel": "{bookings} this week",
+      "bookingsThisMonthHint": "{count} this month",
+      "noShowRateLabel": "No-show rate",
+      "last30Days": "Last 30 days",
+      "medianResponseLabel": "Median response time",
+      "medianResponseHint": "First reply to a new {customer}, approx.",
+      "conversionLabel": "{customer} → {booking} rate",
+      "last30DaysApprox": "Last 30 days, approx.",
+      "needsAttention": "Needs attention",
+      "needsAttentionHint": "{customers} waiting on your team — see the Needs attention tab.",
+      "needsAttentionEmpty": "Nothing waiting on your team right now."
+    },
+    "upcomingToday": {
+      "title": "{bookings} left today",
+      "viewAll": "View all",
+      "unnamedCustomer": "Unnamed {customer}",
+      "empty": "Nothing else on the books for today."
+    }
+  },
+  "Billing": {
+    "title": "Billing",
+    "description": "Your plan and this month's usage.",
+    "planLabel": "Current plan",
+    "planTrial": "Trial",
+    "planPro": "Pro",
+    "planPastDue": "Past due",
+    "planUnknown": "{plan}",
+    "pastDueNotice": "Your last payment didn't go through — update your card with Stripe to stay on Pro.",
+    "usageTitle": "This month's usage",
+    "usageDescription": "An estimate from token counts, not an exact bill — {month}.",
+    "tokensLabel": "Tokens used",
+    "tokensValue": "{input} in / {output} out",
+    "callsLabel": "AI replies",
+    "costLabel": "Estimated cost",
+    "upgradeTitle": "Upgrade to Pro",
+    "upgradeDescription": "Placeholder pricing — ${price}/mo, to be confirmed before launch.",
+    "upgradeButton": "Upgrade to Pro",
+    "upgradeButtonLoading": "Redirecting…",
+    "notConfiguredNotice": "Billing isn't set up on this deployment yet — ask an admin to connect Stripe.",
+    "checkoutNotConfigured": "Billing isn't configured yet on this deployment.",
+    "checkoutGenericError": "Couldn't start checkout — try again in a moment.",
+    "checkoutSuccessBanner": "Checkout complete — your plan will update shortly.",
+    "checkoutCancelledBanner": "Checkout cancelled — you're still on your current plan."
+  }
+}

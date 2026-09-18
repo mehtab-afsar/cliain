@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useSettingsField } from "../hooks/use-settings-field";
@@ -22,12 +23,13 @@ export function SettingsSelectField({
   onSaved,
 }: SettingsSelectFieldProps) {
   const { value, setValue, commit, status } = useSettingsField(field, initialValue, onSaved);
+  const t = useTranslations("Common");
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={field}>{label}</Label>
-        {status === "saved" ? <span className="text-xs text-success">Saved ✓</span> : null}
+        {status === "saved" ? <span className="text-xs text-success">{t("saved")}</span> : null}
       </div>
       <Select
         value={value}
@@ -38,7 +40,7 @@ export function SettingsSelectField({
         }}
       >
         <SelectTrigger id={field}>
-          <SelectValue placeholder="Select…" />
+          <SelectValue placeholder={t("select")} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

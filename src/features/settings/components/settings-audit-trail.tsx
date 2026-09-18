@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { fetchSettingsAudit, type AuditRow } from "../services/settings-client";
 
 function formatValue(value: unknown): string {
@@ -20,6 +21,7 @@ function formatAt(iso: string): string {
 
 export function SettingsAuditTrail({ fieldPrefix }: { fieldPrefix: string }) {
   const [rows, setRows] = useState<AuditRow[] | null>(null);
+  const t = useTranslations("Settings.auditTrail");
 
   useEffect(() => {
     fetchSettingsAudit(fieldPrefix).then(setRows);
@@ -29,7 +31,7 @@ export function SettingsAuditTrail({ fieldPrefix }: { fieldPrefix: string }) {
 
   return (
     <div className="mt-10 border-t border-border pt-6">
-      <h3 className="text-sm font-medium text-foreground">Recent changes</h3>
+      <h3 className="text-sm font-medium text-foreground">{t("title")}</h3>
       <div className="mt-3 flex flex-col gap-2">
         {rows.map((row) => (
           <p key={row.id} className="text-xs text-muted-foreground">

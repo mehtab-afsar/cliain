@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useIntegrations } from "../hooks/use-integrations";
 import { IntegrationCard } from "./integration-card";
 import { IntegrationHelp, WHATSAPP_HELP } from "./integration-help";
@@ -33,6 +34,7 @@ export function IntegrationsSection({ labels }: { labels: TemplateContent["label
   const { status, savingProvider, errorByProvider, save, disconnect, enablePhoneCalls, disablePhoneCalls } =
     useIntegrations();
   const googleCalendarBanner = useGoogleCalendarOAuthBanner();
+  const t = useTranslations("Settings.integrations");
 
   if (!status) return null;
 
@@ -42,21 +44,21 @@ export function IntegrationsSection({ labels }: { labels: TemplateContent["label
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="font-heading text-lg text-foreground">Integrations</h2>
+        <h2 className="font-heading text-lg text-foreground">{t("title")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect the channels Cliain uses to talk to your {customers}.
+          {t("description", { customers })}
         </p>
       </div>
 
       {googleCalendarBanner === "connected" ? (
         <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3.5 py-2.5 text-sm text-success">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
-          Google Calendar connected — new bookings will start mirroring over.
+          {t("googleCalendarConnected")}
         </div>
       ) : googleCalendarBanner === "error" ? (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
           <XCircle className="h-4 w-4 shrink-0" />
-          Couldn&apos;t connect Google Calendar — try again below.
+          {t("googleCalendarError")}
         </div>
       ) : null}
 
@@ -64,37 +66,37 @@ export function IntegrationsSection({ labels }: { labels: TemplateContent["label
 
       <IntegrationCard
         title="WhatsApp"
-        description={`Lets ${customers} text your ${business} and get booked by Cliain.`}
+        description={t("whatsappDescription", { customers, business })}
         connected={status.whatsapp.connected}
         isSaving={savingProvider === "whatsapp"}
         error={errorByProvider.whatsapp}
         help={<IntegrationHelp {...WHATSAPP_HELP} />}
         webhookUrl={{
-          label: "Webhook URL — paste into your Meta App's WhatsApp product",
+          label: t("webhookUrlLabel"),
           value: status.webhookUrls?.whatsapp ?? null,
         }}
         fields={[
           {
             key: "phoneNumberId",
-            label: "Phone number ID",
-            placeholder: "From your Meta App's WhatsApp product",
+            label: t("phoneNumberIdLabel"),
+            placeholder: t("phoneNumberIdPlaceholder"),
             initialValue: status.whatsapp.phoneNumberId,
           },
           {
             key: "accessToken",
-            label: "Access token",
+            label: t("accessTokenLabel"),
             secret: true,
           },
           {
             key: "verifyToken",
-            label: "Webhook verify token",
-            placeholder: "Any secret string you choose",
+            label: t("verifyTokenLabel"),
+            placeholder: t("verifyTokenPlaceholder"),
             secret: true,
           },
           {
             key: "appSecret",
-            label: "App secret",
-            placeholder: status.whatsapp.hasAppSecret ? undefined : "Required — verifies requests came from Meta",
+            label: t("appSecretLabel"),
+            placeholder: status.whatsapp.hasAppSecret ? undefined : t("appSecretPlaceholder"),
             secret: true,
           },
         ]}

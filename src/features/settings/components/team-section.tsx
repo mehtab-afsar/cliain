@@ -1,19 +1,25 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useTeam } from "../hooks/use-team";
 import type { TemplateContent } from "@/features/templates/types";
 
 export function TeamSection({ labels }: { labels: TemplateContent["labels"] }) {
   const { members, invitations, isCreating, error, invite, revoke } = useTeam();
+  const t = useTranslations("Settings.team");
+  const tCommon = useTranslations("Common");
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="font-heading text-lg text-foreground">Team</h2>
+        <h2 className="font-heading text-lg text-foreground">{t("title")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Invite staff to share this {labels.businessNoun.toLowerCase()}&apos;s {labels.customerPlural.toLowerCase()} and{" "}
-          {labels.bookingPlural.toLowerCase()}.
+          {t("description", {
+            business: labels.businessNoun.toLowerCase(),
+            customers: labels.customerPlural.toLowerCase(),
+            bookings: labels.bookingPlural.toLowerCase(),
+          })}
         </p>
       </div>
 
@@ -28,7 +34,7 @@ export function TeamSection({ labels }: { labels: TemplateContent["labels"] }) {
 
       {invitations.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase">Pending invites</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase">{t("pendingInvites")}</p>
           {invitations.map((invitation) => (
             <div
               key={invitation.id}
@@ -42,10 +48,10 @@ export function TeamSection({ labels }: { labels: TemplateContent["labels"] }) {
                   variant="outline"
                   onClick={() => navigator.clipboard.writeText(invitation.url)}
                 >
-                  Copy
+                  {tCommon("copy")}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => revoke(invitation.id)}>
-                  Revoke
+                  {tCommon("revoke")}
                 </Button>
               </div>
             </div>
@@ -56,7 +62,7 @@ export function TeamSection({ labels }: { labels: TemplateContent["labels"] }) {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <Button type="button" variant="outline" disabled={isCreating} onClick={() => invite()} className="self-start">
-        {isCreating ? "Creating…" : "Invite staff member"}
+        {isCreating ? tCommon("creating") : t("inviteButton")}
       </Button>
     </div>
   );

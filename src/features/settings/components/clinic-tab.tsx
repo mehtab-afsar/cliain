@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { LanguageChipsField } from "./language-chips-field";
@@ -9,6 +10,7 @@ import type { ClinicSettingsData } from "../schema";
 
 export function ClinicTab() {
   const { settings, reload } = useTenantSettings<ClinicSettingsData>();
+  const t = useTranslations("Settings.clinic");
   if (!settings) return null;
 
   const doctorName = settings.doctors[0]?.name?.trim().toLowerCase();
@@ -18,46 +20,46 @@ export function ClinicTab() {
     <div className="flex max-w-xl flex-col gap-6">
       {sameName ? (
         <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
-          Your clinic and your doctor have the same name. Patients will see both; is that right?
+          {t("sameNameWarning")}
         </div>
       ) : null}
 
       <SettingsField
         field="clinic.name"
-        label="Clinic name"
+        label={t("nameLabel")}
         initialValue={settings.clinic.name}
-        help="Shown to patients when Cliain messages them."
+        help={t("nameHelp")}
         onSaved={reload}
       />
       <SettingsField
         field="clinic.displayName"
-        label="Display name (optional)"
+        label={t("displayNameLabel")}
         initialValue={settings.clinic.displayName ?? ""}
         defaultValue=""
-        help="If patients should see a different name than the clinic name above."
+        help={t("displayNameHelp")}
         onSaved={reload}
       />
       <SettingsField
         field="clinic.address"
-        label="Address"
+        label={t("addressLabel")}
         initialValue={settings.clinic.address ?? ""}
         defaultValue=""
         multiline
-        help="The AI uses this to answer 'where are you?'"
+        help={t("addressHelp")}
         onSaved={reload}
       />
       <SettingsField
         field="clinic.phoneShownToPatients"
-        label="Phone number shown to patients"
+        label={t("phoneLabel")}
         initialValue={settings.clinic.phoneShownToPatients ?? ""}
         defaultValue=""
         onSaved={reload}
       />
       <LanguageChipsField
         field="clinic.languages"
-        label="Languages patients use"
+        label={t("languagesLabel")}
         initialValue={settings.clinic.languages}
-        help="Drives the language the AI replies in."
+        help={t("languagesHelp")}
       />
 
       <SettingsAuditTrail fieldPrefix="clinic." />
@@ -65,9 +67,9 @@ export function ClinicTab() {
       {/* Doctor profile and working hours aren't independently editable here yet (multi-doctor
           support is a later phase) — the setup wizard is still the way to change them. */}
       <p className="text-sm text-muted-foreground">
-        Need to change your doctor&apos;s profile or working hours?{" "}
+        {t("editProfilePrefix")}{" "}
         <Link href="/onboarding" className="text-primary hover:underline">
-          Go through setup again
+          {t("editProfileCta")}
         </Link>
         .
       </p>

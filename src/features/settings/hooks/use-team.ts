@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { InvitationSummary, TeamMember } from "@/features/invitations/services/invitation-service";
 import {
   createInvitationRequest,
@@ -14,6 +15,7 @@ export function useTeam() {
   const [invitations, setInvitations] = useState<InvitationSummary[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useTranslations("Settings.team");
 
   const refresh = useCallback(async () => {
     const [nextMembers, nextInvitations] = await Promise.all([fetchTeamMembers(), fetchInvitations()]);
@@ -35,11 +37,11 @@ export function useTeam() {
       await createInvitationRequest();
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create invite link.");
+      setError(err instanceof Error ? err.message : t("inviteFailed"));
     } finally {
       setIsCreating(false);
     }
-  }, [refresh]);
+  }, [refresh, t]);
 
   const revoke = useCallback(
     async (invitationId: string) => {

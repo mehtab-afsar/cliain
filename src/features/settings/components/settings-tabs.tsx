@@ -2,22 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { TemplateContent } from "@/features/templates/types";
 
-function buildTabs(labels: TemplateContent["labels"]) {
+// `labels.businessNoun` is vertical terminology (resolved per-tenant, English-only for now —
+// see src/i18n/request.ts) so it's left untouched; `tabsT` supplies the locale-aware chrome for
+// the other, non-vertical tab names.
+function buildTabs(labels: TemplateContent["labels"], tabsT: (key: string) => string) {
   return [
     { href: "/dashboard/settings/clinic", label: labels.businessNoun },
-    { href: "/dashboard/settings/messaging", label: "Messaging" },
-    { href: "/dashboard/settings/safety", label: "Safety" },
-    { href: "/dashboard/settings/integrations", label: "Integrations" },
-    { href: "/dashboard/settings/team", label: "Team" },
+    { href: "/dashboard/settings/messaging", label: tabsT("messaging") },
+    { href: "/dashboard/settings/safety", label: tabsT("safety") },
+    { href: "/dashboard/settings/integrations", label: tabsT("integrations") },
+    { href: "/dashboard/settings/team", label: tabsT("team") },
+    { href: "/dashboard/settings/billing", label: tabsT("billing") },
   ];
 }
 
 export function SettingsTabs({ labels }: { labels: TemplateContent["labels"] }) {
   const pathname = usePathname();
-  const tabs = buildTabs(labels);
+  const tabsT = useTranslations("Settings.tabs");
+  const tabs = buildTabs(labels, tabsT);
 
   return (
     <nav className="flex shrink-0 flex-col gap-0.5 sm:w-44">

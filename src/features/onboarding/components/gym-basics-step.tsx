@@ -1,4 +1,7 @@
+"use client";
+
 import { Building2, Globe } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,12 +20,14 @@ type GymBasicsStepProps = {
 };
 
 export function GymBasicsStep({ value, onChange }: GymBasicsStepProps) {
+  const t = useTranslations("Onboarding.gymBasics");
+  const tFields = useTranslations("Onboarding.fields");
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label htmlFor="gym-name" className="flex items-center gap-1.5">
           <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-          Gym name
+          {t("nameLabel")}
         </Label>
         <Input
           id="gym-name"
@@ -35,7 +40,7 @@ export function GymBasicsStep({ value, onChange }: GymBasicsStepProps) {
       <div className="flex flex-col gap-2">
         <Label htmlFor="gym-timezone" className="flex items-center gap-1.5">
           <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-          Timezone
+          {tFields("timezoneLabel")}
         </Label>
         <Select
           value={value.timezone}
@@ -44,7 +49,7 @@ export function GymBasicsStep({ value, onChange }: GymBasicsStepProps) {
           }}
         >
           <SelectTrigger id="gym-timezone" className="w-full">
-            <SelectValue placeholder="Select a timezone" />
+            <SelectValue placeholder={tFields("selectTimezonePlaceholder")} />
           </SelectTrigger>
           <SelectContent>
             {timezoneOptions(value.timezone).map((timezone) => (

@@ -2,16 +2,16 @@ import { HEADING_FONT } from "../styles";
 
 const STEPS = [
   {
-    title: "A patient texts or calls",
-    body: "They use WhatsApp or ring your clinic's existing number. Nothing to download, no new number to learn.",
+    title: "Someone texts or calls",
+    body: "They use WhatsApp or ring your business's existing number — a patient booking with a doctor, a member booking a class. Nothing to download, no new number to learn.",
   },
   {
     title: "Cliain checks your real calendar",
     body: "It reads your working hours and existing bookings and offers only the slots that are actually open.",
   },
   {
-    title: "The appointment is booked",
-    body: "The moment the patient picks a time, it's written to your calendar and confirmed back to them.",
+    title: "The booking is confirmed",
+    body: "The moment they pick a time, it's written to your calendar and confirmed back to them.",
   },
   {
     title: "Reminders go out on their own",
@@ -26,10 +26,11 @@ export function HowItWorksSection() {
         <h2
           className={`max-w-[18ch] text-[clamp(30px,3.6vw,44px)] leading-[1.08] font-medium tracking-[-0.03em] ${HEADING_FONT}`}
         >
-          From a message to a booked appointment, without you.
+          From a message to a confirmed booking, without you.
         </h2>
         <p className="mt-4 max-w-[48ch] text-lg text-[var(--ink-2)]">
-          Here is exactly what happens when a patient reaches out.
+          Here is exactly what happens when someone reaches out — whether that&apos;s a patient
+          booking with a doctor or a member booking a class.
         </p>
 
         <ol className="mt-14 border-t border-[var(--line)]">

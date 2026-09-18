@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { LanguageChipsField } from "./language-chips-field";
@@ -9,6 +10,7 @@ import type { GymSettingsData } from "@/features/templates/gym-v1/schema";
 
 export function GymTab() {
   const { settings, reload } = useTenantSettings<GymSettingsData>();
+  const t = useTranslations("Settings.gym");
   if (!settings) return null;
 
   const trainerName = settings.trainers[0]?.name?.trim().toLowerCase();
@@ -18,46 +20,46 @@ export function GymTab() {
     <div className="flex max-w-xl flex-col gap-6">
       {sameName ? (
         <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
-          Your gym and your trainer have the same name. Members will see both; is that right?
+          {t("sameNameWarning")}
         </div>
       ) : null}
 
       <SettingsField
         field="gym.name"
-        label="Gym name"
+        label={t("nameLabel")}
         initialValue={settings.gym.name}
-        help="Shown to members when Cliain messages them."
+        help={t("nameHelp")}
         onSaved={reload}
       />
       <SettingsField
         field="gym.displayName"
-        label="Display name (optional)"
+        label={t("displayNameLabel")}
         initialValue={settings.gym.displayName ?? ""}
         defaultValue=""
-        help="If members should see a different name than the gym name above."
+        help={t("displayNameHelp")}
         onSaved={reload}
       />
       <SettingsField
         field="gym.address"
-        label="Address"
+        label={t("addressLabel")}
         initialValue={settings.gym.address ?? ""}
         defaultValue=""
         multiline
-        help="The AI uses this to answer 'where are you?'"
+        help={t("addressHelp")}
         onSaved={reload}
       />
       <SettingsField
         field="gym.phoneShownToMembers"
-        label="Phone number shown to members"
+        label={t("phoneLabel")}
         initialValue={settings.gym.phoneShownToMembers ?? ""}
         defaultValue=""
         onSaved={reload}
       />
       <LanguageChipsField
         field="gym.languages"
-        label="Languages members use"
+        label={t("languagesLabel")}
         initialValue={settings.gym.languages}
-        help="Drives the language the AI replies in."
+        help={t("languagesHelp")}
       />
 
       <SettingsAuditTrail fieldPrefix="gym." />
@@ -66,9 +68,9 @@ export function GymTab() {
           (multi-trainer/multi-class support is a later phase) — the setup wizard is still the
           way to change them. */}
       <p className="text-sm text-muted-foreground">
-        Need to change your trainer&apos;s profile, class, or working hours?{" "}
+        {t("editProfilePrefix")}{" "}
         <Link href="/onboarding" className="text-primary hover:underline">
-          Go through setup again
+          {t("editProfileCta")}
         </Link>
         .
       </p>

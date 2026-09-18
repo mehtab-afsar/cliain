@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Menu } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -20,6 +21,7 @@ type MobileSidebarProps = {
 
 export function MobileSidebar({ clinicName, labels }: MobileSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const t = useTranslations("DashboardShell.mobileSidebar");
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -27,12 +29,12 @@ export function MobileSidebar({ clinicName, labels }: MobileSidebarProps) {
         render={<Button variant="ghost" size="icon" className="md:hidden" />}
       >
         <Menu className="h-5 w-5" />
-        <span className="sr-only">Open navigation</span>
+        <span className="sr-only">{t("openNavigation")}</span>
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0">
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
+        <SheetTitle className="sr-only">{t("navigationTitle")}</SheetTitle>
         <SheetDescription className="sr-only">
-          Cliain dashboard navigation
+          {t("navigationDescription")}
         </SheetDescription>
         <SidebarBody
           isCollapsed={false}

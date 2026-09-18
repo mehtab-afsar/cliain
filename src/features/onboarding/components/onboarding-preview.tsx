@@ -1,4 +1,7 @@
+"use client";
+
 import { Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   ChatPreviewCard,
   type ChatMessage,
@@ -122,6 +125,10 @@ function buildConversation(draft: OnboardingDraft, stepKey: OnboardingStepConfig
 }
 
 export function OnboardingPreview({ draft, step }: OnboardingPreviewProps) {
+  // The simulated chat script itself (buildConversation above) stays in English for this pass —
+  // it's a preview of what an English-speaking customer sees, not dashboard chrome; only the
+  // surrounding card chrome (subtitle, badge, caption) is locale-aware.
+  const t = useTranslations("Onboarding.preview");
   const businessName =
     (isGymDraft(draft) ? draft.gymBasics?.gymName : draft.clinicBasics?.clinicName)?.trim() || "Your Business";
   const messages = buildConversation(draft, step.key);
@@ -131,20 +138,18 @@ export function OnboardingPreview({ draft, step }: OnboardingPreviewProps) {
       <ChatPreviewCard
         avatarLabel={businessName.trim().charAt(0).toUpperCase() || "C"}
         title={businessName}
-        subtitle="via WhatsApp"
+        subtitle={t("viaWhatsapp")}
         badge={
           step.key === "review" ? (
             <span className="flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
               <Check className="h-3 w-3" />
-              Confirmed
+              {t("confirmed")}
             </span>
           ) : undefined
         }
         messages={messages}
       />
-      <p className="max-w-sm text-center text-xs text-muted-foreground">
-        A live preview of what your customers will see
-      </p>
+      <p className="max-w-sm text-center text-xs text-muted-foreground">{t("caption")}</p>
     </div>
   );
 }

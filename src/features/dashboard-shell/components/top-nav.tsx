@@ -1,5 +1,8 @@
+"use client";
+
 import { Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +16,7 @@ import { TourMenuItem } from "@/features/product-tour";
 import { LogoMark } from "@/features/landing/components/logo-mark";
 import { MobileSidebar } from "./mobile-sidebar";
 import { SignOutMenuItem } from "./sign-out-menu-item";
+import { LanguageSwitcher } from "./language-switcher";
 import type { TemplateContent } from "@/features/templates/types";
 
 type TopNavProps = {
@@ -23,6 +27,7 @@ type TopNavProps = {
 
 export function TopNav({ clinicName, doctorName, labels }: TopNavProps) {
   const initial = (doctorName ?? clinicName ?? "C").trim().charAt(0).toUpperCase();
+  const t = useTranslations("Common");
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 bg-background shadow-elevation-sm px-4 sm:px-6">
@@ -35,27 +40,31 @@ export function TopNav({ clinicName, doctorName, labels }: TopNavProps) {
         </p>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          data-tour-id="tour-account"
-          render={<Button variant="ghost" className="h-9 gap-2 px-1.5" />}
-        >
-          <Avatar className="h-7 w-7">
-            <AvatarFallback className="bg-accent text-xs text-accent-foreground">
-              {initial}
-            </AvatarFallback>
-          </Avatar>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
-            <SettingsIcon className="h-4 w-4" />
-            Settings
-          </DropdownMenuItem>
-          <TourMenuItem />
-          <DropdownMenuSeparator />
-          <SignOutMenuItem />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-1">
+        <LanguageSwitcher />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            data-tour-id="tour-account"
+            render={<Button variant="ghost" className="h-9 gap-2 px-1.5" />}
+          >
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="bg-accent text-xs text-accent-foreground">
+                {initial}
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
+              <SettingsIcon className="h-4 w-4" />
+              {t("settings")}
+            </DropdownMenuItem>
+            <TourMenuItem />
+            <DropdownMenuSeparator />
+            <SignOutMenuItem />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }

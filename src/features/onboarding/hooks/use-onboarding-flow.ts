@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { getSavedClinic } from "../services/clinic-service";
 import {
   createEmptyDraft,
@@ -19,36 +20,38 @@ import type {
   WorkingHoursDay,
 } from "../types";
 
-function validateStep(stepKey: string, draft: OnboardingDraft): string | null {
+type ValidationT = ReturnType<typeof useTranslations<"Onboarding.validation">>;
+
+function validateStep(stepKey: string, draft: OnboardingDraft, t: ValidationT): string | null {
   if (stepKey === "clinic-basics") {
-    if (!draft.clinicBasics?.clinicName.trim()) return "Enter your clinic's name.";
-    if (!draft.clinicBasics?.timezone.trim()) return "Select a timezone.";
+    if (!draft.clinicBasics?.clinicName.trim()) return t("clinicName");
+    if (!draft.clinicBasics?.timezone.trim()) return t("timezone");
     return null;
   }
   if (stepKey === "doctor-profile") {
-    if (!draft.doctorProfile?.doctorName.trim()) return "Enter the doctor's name.";
+    if (!draft.doctorProfile?.doctorName.trim()) return t("doctorName");
     return null;
   }
   if (stepKey === "gym-basics") {
-    if (!draft.gymBasics?.gymName.trim()) return "Enter your gym's name.";
-    if (!draft.gymBasics?.timezone.trim()) return "Select a timezone.";
+    if (!draft.gymBasics?.gymName.trim()) return t("gymName");
+    if (!draft.gymBasics?.timezone.trim()) return t("timezone");
     return null;
   }
   if (stepKey === "trainer-profile") {
-    if (!draft.trainerProfile?.trainerName.trim()) return "Enter the trainer's name.";
+    if (!draft.trainerProfile?.trainerName.trim()) return t("trainerName");
     return null;
   }
   if (stepKey === "class-setup") {
-    if (!draft.classSetup?.className.trim()) return "Enter a class name.";
-    if (!draft.classSetup || draft.classSetup.durationMinutes <= 0) return "Enter a class duration.";
-    if (!draft.classSetup || draft.classSetup.capacity <= 0) return "Enter a class capacity.";
+    if (!draft.classSetup?.className.trim()) return t("className");
+    if (!draft.classSetup || draft.classSetup.durationMinutes <= 0) return t("classDuration");
+    if (!draft.classSetup || draft.classSetup.capacity <= 0) return t("classCapacity");
     return null;
   }
   if (stepKey === "working-hours") {
     const openDays = draft.workingHours.filter((day) => day.isOpen);
-    if (openDays.length === 0) return "Open at least one day of the week.";
+    if (openDays.length === 0) return t("openDay");
     const invalidDay = openDays.find((day) => day.startTime >= day.endTime);
-    if (invalidDay) return `${invalidDay.label}'s closing time must be after opening time.`;
+    if (invalidDay) return t("closingTimeAfterOpening", { day: invalidDay.label });
     return null;
   }
   return null;
@@ -61,6 +64,7 @@ export function useOnboardingFlow() {
   const [error, setError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const t = useTranslations("Onboarding.validation");
 
   const templateVersion = getDraftTemplateVersion(draft);
   const steps = useMemo(() => getOnboardingSteps(templateVersion), [templateVersion]);
@@ -143,7 +147,7 @@ export function useOnboardingFlow() {
   );
 
   const goNext = useCallback(() => {
-    const validationError = validateStep(steps[stepIndex].key, draft);
+    const validationError = validateStep(steps[stepIndex].key, draft, t);
     if (validationError) {
       setError(validationError);
       return false;
@@ -151,7 +155,7 @@ export function useOnboardingFlow() {
     setError(null);
     setStepIndex((index) => Math.min(index + 1, steps.length - 1));
     return true;
-  }, [stepIndex, draft, steps]);
+  }, [stepIndex, draft, steps, t]);
 
   const goBack = useCallback(() => {
     setError(null);
@@ -168,7 +172,7 @@ export function useOnboardingFlow() {
   );
 
   const finish = useCallback(async () => {
-    const validationError = validateStep(steps[stepIndex].key, draft);
+    const validationError = validateStep(steps[stepIndex].key, draft, t);
     if (validationError) {
       setError(validationError);
       return null;
@@ -180,12 +184,12 @@ export function useOnboardingFlow() {
       setDraft(completed);
       return completed;
     } catch {
-      setError("Couldn't save your setup — check your connection and try again.");
+      setError(t("saveFailed"));
       return null;
     } finally {
       setIsSubmitting(false);
     }
-  }, [draft, stepIndex, steps]);
+  }, [draft, stepIndex, steps, t]);
 
   return {
     draft,

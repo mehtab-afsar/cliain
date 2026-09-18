@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettingsField } from "../hooks/use-settings-field";
@@ -14,6 +15,7 @@ type SettingsToggleFieldProps = {
 
 export function SettingsToggleField({ field, label, help, initialValue, onSaved }: SettingsToggleFieldProps) {
   const { value, commit, status } = useSettingsField(field, initialValue, onSaved);
+  const t = useTranslations("Common");
 
   return (
     <div className="flex items-start justify-between gap-4">
@@ -22,7 +24,7 @@ export function SettingsToggleField({ field, label, help, initialValue, onSaved 
         {help ? <p className="mt-1 text-xs text-muted-foreground">{help}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {status === "saved" ? <span className="text-xs text-success">Saved ✓</span> : null}
+        {status === "saved" ? <span className="text-xs text-success">{t("saved")}</span> : null}
         <Switch
           id={field}
           checked={value}

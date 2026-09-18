@@ -4,6 +4,12 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useSettingsField } from "../hooks/use-settings-field";
 
+// Deliberately not run through the i18n message catalog: these are the *customer-facing* reply
+// languages (the `clinic.languages`/`gym.languages` settings field, sourced by the AI's system
+// prompt), not staff-facing dashboard chrome — an entirely different axis from the locale this
+// app's UI renders in (see src/i18n/request.ts). The chip *label*/`help` text passed in by the
+// caller is locale-aware; the language names themselves are the literal stored values and stay
+// as-is regardless of which dashboard locale is active.
 const LANGUAGE_OPTIONS = [
   "English",
   "Hindi",

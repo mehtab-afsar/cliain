@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/features/landing/components/logo-mark";
 import { OnboardingStepper, type OnboardingStepMeta } from "./onboarding-stepper";
@@ -34,6 +37,9 @@ export function OnboardingLayout({
   children,
   preview,
 }: OnboardingLayoutProps) {
+  const t = useTranslations("Onboarding.layout");
+  const tCommon = useTranslations("Common");
+
   return (
     <div className="flex min-h-full flex-col bg-background">
       <header className="border-b border-border">
@@ -45,7 +51,7 @@ export function OnboardingLayout({
       <div className="mx-auto grid w-full max-w-5xl flex-1 gap-x-12 px-6 py-12 lg:grid-cols-[1fr_20rem]">
         <div className="flex w-full max-w-2xl flex-col">
           <p className="font-mono text-xs text-muted-foreground">
-            Step {stepIndex + 1} of {steps.length}
+            {t("stepProgress", { current: stepIndex + 1, total: steps.length })}
           </p>
           <div className="mt-3">
             <OnboardingStepper steps={steps} currentIndex={stepIndex} />
@@ -75,10 +81,10 @@ export function OnboardingLayout({
               onClick={onBack}
               className={isFirstStep ? "invisible" : undefined}
             >
-              Back
+              {tCommon("back")}
             </Button>
             <Button onClick={onNext} disabled={isNextDisabled}>
-              {nextLabel ?? (isLastStep ? "Finish setup" : "Continue")}
+              {nextLabel ?? (isLastStep ? t("finishSetup") : tCommon("continue"))}
             </Button>
           </div>
         </div>

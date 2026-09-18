@@ -14,7 +14,9 @@ type SidebarNavItemProps = {
 
 export function SidebarNavItem({ item, isCollapsed, onNavigate }: SidebarNavItemProps) {
   const pathname = usePathname();
-  const isActive = pathname.startsWith(item.href);
+  // "/dashboard" (Overview) is a path prefix of every other nav item's href, so it needs an
+  // exact match — startsWith alone would make Overview show as "active" on every dashboard page.
+  const isActive = item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href);
   const Icon = item.icon;
 
   const link = (

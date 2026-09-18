@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { SettingsSelectField } from "./settings-select-field";
@@ -22,36 +23,37 @@ function capitalize(value: string): string {
 export function MessagingTab({ templateVersion }: { templateVersion: string }) {
   const template = resolveTemplateByVersion(templateVersion);
   const { settings, reload } = useTenantSettings<SharedMessagingSettings>();
+  const t = useTranslations("Settings.messaging");
   if (!settings) return null;
 
   const toneOptions = Object.keys(template.toneStyle).map((value) => ({ value, label: capitalize(value) }));
-  const { customerSingular } = template.labels;
+  const { customerPlural } = template.labels;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
       <div className="flex max-w-xl flex-col gap-6">
         <SettingsField
           field="messaging.greeting"
-          label="Greeting"
+          label={t("greetingLabel")}
           multiline
           initialValue={settings.messaging.greeting ?? ""}
           defaultValue=""
           placeholder={template.defaultGreeting}
-          help="Variables: {business}, {resource}."
+          help={t("greetingHelp")}
           onSaved={reload}
         />
         <SettingsSelectField
           field="messaging.tone"
-          label="Tone"
+          label={t("toneLabel")}
           initialValue={settings.messaging.tone}
           options={toneOptions}
           onSaved={reload}
         />
         <SettingsToggleField
           field="messaging.disclosureEnabled"
-          label={`Tell ${customerSingular.toLowerCase()}s they're talking to an automated assistant`}
+          label={t("disclosureLabel", { customerPlural: customerPlural.toLowerCase() })}
           initialValue={settings.messaging.disclosureEnabled}
-          help="Recommended to keep this on."
+          help={t("disclosureHelp")}
           onSaved={reload}
         />
         <SettingsAuditTrail fieldPrefix="messaging." />

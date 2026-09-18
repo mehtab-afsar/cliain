@@ -141,6 +141,23 @@ model Tenant {
   // back to a hardcoded default in code when unset).
   emergencyScript          String? @db.Text
   escalationWhatsappNumber String?
+
+  // Billing (Stripe) — see src/lib/stripe.ts / src/features/billing. Platform-wide account
+  // (this deployment's own Stripe account), unlike WhatsApp/Calendar which are per-tenant
+  // credentials — these four columns just record what Stripe knows about this tenant.
+  // `plan` (above) is the source of truth billing-gating logic reads; the webhook handler in
+  // src/app/api/webhooks/stripe/route.ts is the only writer of these five fields together.
+  // stripeCustomerId/stripeSubscriptionId are unique so two tenants can never point at the
+  // same Stripe object; Postgres allows multiple NULLs, so tenants who never checked out
+  // don't conflict with each other.
+  stripeCustomerId         String?   @unique
+  stripeSubscriptionId     String?   @unique
+  // Stripe's own subscription.status ("active", "past_due", "canceled", "trialing", ...) —
+  // kept verbatim (not remapped) so the webhook handler and any future admin view can trust
+  // it matches Stripe's dashboard exactly; `plan` is the derived/simplified field app code
+  // actually branches on.
+  stripeSubscriptionStatus String?
+  stripeCurrentPeriodEnd   DateTime?
 }
 
 // A branch. Every Cliain 1.0 tenant implicitly had exactly one (the clinic itself) — this

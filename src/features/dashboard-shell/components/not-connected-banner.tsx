@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const DISMISS_KEY = "cliain:not-connected-banner-dismissed";
 
@@ -17,6 +18,7 @@ const DISMISS_KEY = "cliain:not-connected-banner-dismissed";
  * hydration, which is the right side of that trade. */
 export function NotConnectedBanner({ whatsappConnected }: { whatsappConnected: boolean }) {
   const [dismissed, setDismissed] = useState(false);
+  const t = useTranslations("DashboardShell.notConnectedBanner");
 
   // Reading an external system (sessionStorage) after mount and syncing it into state is
   // exactly what this lint rule is otherwise guarding against accidental re-derivation of —
@@ -45,16 +47,16 @@ export function NotConnectedBanner({ whatsappConnected }: { whatsappConnected: b
   return (
     <div className="flex items-center justify-between gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm sm:px-6">
       <p className="text-foreground">
-        Cliain isn&apos;t answering yet.{" "}
+        {t("message")}{" "}
         <Link href="/dashboard/settings/integrations" className="font-medium underline underline-offset-2">
-          Connect WhatsApp
+          {t("cta")}
         </Link>{" "}
-        to go live.
+        {t("suffix")}
       </p>
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Dismiss"
+        aria-label={t("dismiss")}
         className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
       >
         <X className="h-4 w-4" />

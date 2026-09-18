@@ -82,6 +82,11 @@ export function ConversationDemo() {
           ✓
         </div>
       </div>
+
+      <p className="mt-4 text-[13px] text-[var(--muted)] min-[900px]:text-right">
+        Shown for a clinic booking a patient with a doctor — a gym booking a member into a class
+        works the same way.
+      </p>
     </div>
   );
 }

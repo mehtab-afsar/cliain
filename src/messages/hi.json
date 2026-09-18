@@ -1,0 +1,253 @@
+{
+  "Common": {
+    "settings": "सेटिंग्स",
+    "back": "पीछे",
+    "continue": "जारी रखें",
+    "save": "सेव करें",
+    "saving": "सेव हो रहा है…",
+    "saved": "सेव हो गया ✓",
+    "creating": "बनाया जा रहा है…",
+    "edit": "बदलें",
+    "copy": "कॉपी करें",
+    "revoke": "रद्द करें",
+    "select": "चुनें…",
+    "resetToDefault": "डिफ़ॉल्ट पर रीसेट करें",
+    "signOut": "साइन आउट करें"
+  },
+  "DashboardShell": {
+    "nav": {
+      "overview": "ओवरव्यू",
+      "tryItOut": "आज़माकर देखें",
+      "needsAttention": "ध्यान देने योग्य",
+      "calendar": "कैलेंडर",
+      "settings": "सेटिंग्स"
+    },
+    "mobileSidebar": {
+      "openNavigation": "नेविगेशन खोलें",
+      "navigationTitle": "नेविगेशन",
+      "navigationDescription": "Cliain डैशबोर्ड नेविगेशन"
+    },
+    "collapseToggle": {
+      "expand": "साइडबार बड़ा करें",
+      "collapse": "साइडबार छोटा करें"
+    },
+    "notConnectedBanner": {
+      "message": "Cliain अभी जवाब नहीं दे रहा है।",
+      "cta": "WhatsApp कनेक्ट करें",
+      "suffix": "और लाइव हो जाएं।",
+      "dismiss": "बंद करें"
+    },
+    "languageSwitcher": {
+      "label": "भाषा बदलें"
+    }
+  },
+  "Settings": {
+    "layout": {
+      "title": "सेटिंग्स",
+      "description": "Cliain क्या कहता और करता है — इसका पूरा नियंत्रण यहाँ है।"
+    },
+    "tabs": {
+      "messaging": "मैसेजिंग",
+      "safety": "सुरक्षा",
+      "integrations": "इंटीग्रेशन",
+      "team": "टीम",
+      "billing": "बिलिंग"
+    },
+    "clinic": {
+      "sameNameWarning": "आपके क्लिनिक और डॉक्टर का नाम एक जैसा है। मरीज़ों को दोनों दिखेंगे; क्या यह सही है?",
+      "nameLabel": "क्लिनिक का नाम",
+      "nameHelp": "Cliain मरीज़ों को मैसेज करते समय यही नाम दिखाता है।",
+      "displayNameLabel": "डिस्प्ले नाम (वैकल्पिक)",
+      "displayNameHelp": "अगर मरीज़ों को ऊपर दिए क्लिनिक नाम से अलग नाम दिखाना है।",
+      "addressLabel": "पता",
+      "addressHelp": "AI इसका इस्तेमाल 'आप कहाँ हैं?' का जवाब देने के लिए करता है।",
+      "phoneLabel": "मरीज़ों को दिखाया जाने वाला फ़ोन नंबर",
+      "languagesLabel": "मरीज़ जिन भाषाओं में बात करते हैं",
+      "languagesHelp": "इससे तय होता है कि AI किस भाषा में जवाब देगा।",
+      "editProfilePrefix": "अपने डॉक्टर की प्रोफ़ाइल या काम के घंटे बदलने हैं?",
+      "editProfileCta": "सेटअप फिर से करें"
+    },
+    "gym": {
+      "sameNameWarning": "आपके जिम और ट्रेनर का नाम एक जैसा है। मेंबर्स को दोनों दिखेंगे; क्या यह सही है?",
+      "nameLabel": "जिम का नाम",
+      "nameHelp": "Cliain मेंबर्स को मैसेज करते समय यही नाम दिखाता है।",
+      "displayNameLabel": "डिस्प्ले नाम (वैकल्पिक)",
+      "displayNameHelp": "अगर मेंबर्स को ऊपर दिए जिम नाम से अलग नाम दिखाना है।",
+      "addressLabel": "पता",
+      "addressHelp": "AI इसका इस्तेमाल 'आप कहाँ हैं?' का जवाब देने के लिए करता है।",
+      "phoneLabel": "मेंबर्स को दिखाया जाने वाला फ़ोन नंबर",
+      "languagesLabel": "मेंबर्स जिन भाषाओं में बात करते हैं",
+      "languagesHelp": "इससे तय होता है कि AI किस भाषा में जवाब देगा।",
+      "editProfilePrefix": "अपने ट्रेनर की प्रोफ़ाइल, क्लास या काम के घंटे बदलने हैं?",
+      "editProfileCta": "सेटअप फिर से करें"
+    },
+    "messaging": {
+      "greetingLabel": "ग्रीटिंग",
+      "greetingHelp": "वेरिएबल: '{business}', '{resource}'।",
+      "toneLabel": "टोन",
+      "disclosureLabel": "{customerPlural} को बताएं कि वे एक ऑटोमेटेड असिस्टेंट से बात कर रहे हैं",
+      "disclosureHelp": "इसे चालू रखने की सलाह दी जाती है।"
+    },
+    "safety": {
+      "intro": "AI किससे बातचीत आगे बढ़ाता है, और किसी इमरजेंसी में क्या कहता है।",
+      "escalationLabel": "एस्केलेशन WhatsApp नंबर",
+      "escalationPlaceholder": "हैंडऑफ़ पर अलर्ट करने के लिए स्टाफ़ का नंबर",
+      "escalationHelp": "इमरजेंसी और जो भी AI हैंडल नहीं कर पाता, उसके लिए उन्हें मैसेज मिलेगा।",
+      "scriptLabel": "इमरजेंसी गाइडेंस",
+      "scriptHelp": "किसी संभावित इमरजेंसी में यह शब्दशः भेजा जाता है — AI इसे बदलता नहीं है।"
+    },
+    "integrations": {
+      "title": "इंटीग्रेशन",
+      "description": "वो चैनल कनेक्ट करें जिनसे Cliain आपके {customers} से बात करता है।",
+      "googleCalendarConnected": "Google Calendar कनेक्ट हो गया — नई बुकिंग्स अब अपने आप मिरर होंगी।",
+      "googleCalendarError": "Google Calendar कनेक्ट नहीं हो सका — नीचे फिर से कोशिश करें।",
+      "whatsappDescription": "{customers} आपके {business} को टेक्स्ट करके Cliain से बुकिंग कर पाएंगे।",
+      "webhookUrlLabel": "वेबहुक URL — इसे अपने Meta App के WhatsApp प्रोडक्ट में पेस्ट करें",
+      "phoneNumberIdLabel": "फ़ोन नंबर ID",
+      "phoneNumberIdPlaceholder": "आपके Meta App के WhatsApp प्रोडक्ट से",
+      "accessTokenLabel": "एक्सेस टोकन",
+      "verifyTokenLabel": "वेबहुक वेरिफ़ाई टोकन",
+      "verifyTokenPlaceholder": "आपकी पसंद की कोई भी सीक्रेट स्ट्रिंग",
+      "appSecretLabel": "ऐप सीक्रेट",
+      "appSecretPlaceholder": "ज़रूरी — यह पुष्टि करता है कि रिक्वेस्ट Meta से आई है",
+      "connected": "कनेक्टेड",
+      "notConnected": "कनेक्टेड नहीं",
+      "advanced": "एडवांस्ड",
+      "webhookUrlMissing": "इस क्लिनिक का वेबहुक URL देखने के लिए अपने डिप्लॉयमेंट में APP_URL सेट करें।",
+      "copyWebhookUrl": "वेबहुक URL कॉपी करें",
+      "disconnect": "डिसकनेक्ट करें",
+      "secretUnchangedPlaceholder": "•••••••• (अपरिवर्तित)"
+    },
+    "team": {
+      "title": "टीम",
+      "description": "इस {business} के {customers} और {bookings} एक साथ संभालने के लिए स्टाफ़ को इनवाइट करें।",
+      "pendingInvites": "पेंडिंग इनवाइट",
+      "inviteButton": "स्टाफ़ मेंबर इनवाइट करें",
+      "inviteFailed": "इनवाइट लिंक नहीं बन सका।"
+    },
+    "auditTrail": {
+      "title": "हाल के बदलाव"
+    }
+  },
+  "Onboarding": {
+    "layout": {
+      "stepProgress": "स्टेप {current} / {total}",
+      "finishSetup": "सेटअप पूरा करें"
+    },
+    "fields": {
+      "timezoneLabel": "टाइमज़ोन",
+      "selectTimezonePlaceholder": "एक टाइमज़ोन चुनें",
+      "whatsappNumberLabel": "WhatsApp नंबर",
+      "whatsappHelp": "अभी यह नहीं है? इसे खाली छोड़ दें — बाद में सेटिंग्स से WhatsApp कनेक्ट कर सकते हैं।",
+      "selectTimePlaceholder": "एक समय चुनें",
+      "dayPlaceholder": "दिन",
+      "at": "बजे",
+      "to": "से",
+      "closed": "बंद"
+    },
+    "templateSelect": {
+      "clinicLabel": "क्लिनिक",
+      "clinicDescription": "डॉक्टर या प्रैक्टिशनर के साथ मरीज़ों की अपॉइंटमेंट बुक करें।",
+      "gymLabel": "जिम",
+      "gymDescription": "ट्रेनर के साथ चलने वाली रिकरिंग क्लास में मेंबर्स को बुक करें।"
+    },
+    "clinicBasics": {
+      "nameLabel": "क्लिनिक का नाम"
+    },
+    "doctorProfile": {
+      "nameLabel": "डॉक्टर का नाम",
+      "specialtyLabel": "स्पेशलिटी"
+    },
+    "gymBasics": {
+      "nameLabel": "जिम का नाम"
+    },
+    "trainerProfile": {
+      "nameLabel": "ट्रेनर का नाम",
+      "roleLabel": "रोल"
+    },
+    "classSetup": {
+      "nameLabel": "क्लास का नाम",
+      "durationLabel": "अवधि (मिनट)",
+      "capacityLabel": "क्षमता",
+      "recursLabel": "यह कब दोहराई जाती है",
+      "help": "Cliain हर हफ़्ते इस क्लास की बुकिंग अगले कुछ हफ़्तों के लिए करता है — बाद में डैशबोर्ड से और जोड़ सकते हैं।"
+    },
+    "preview": {
+      "viaWhatsapp": "WhatsApp के ज़रिए",
+      "confirmed": "कन्फ़र्म",
+      "caption": "आपके कस्टमर्स को यही लाइव प्रीव्यू दिखेगा"
+    },
+    "review": {
+      "gym": "जिम",
+      "clinic": "क्लिनिक",
+      "trainer": "ट्रेनर",
+      "doctor": "डॉक्टर",
+      "workingHours": "काम के घंटे",
+      "classSection": "क्लास",
+      "noRoleSet": "कोई रोल सेट नहीं",
+      "noSpecialtySet": "कोई स्पेशलिटी सेट नहीं",
+      "whatsappNotConnected": "WhatsApp अभी कनेक्ट नहीं है"
+    },
+    "validation": {
+      "clinicName": "अपने क्लिनिक का नाम दर्ज करें।",
+      "timezone": "एक टाइमज़ोन चुनें।",
+      "doctorName": "डॉक्टर का नाम दर्ज करें।",
+      "gymName": "अपने जिम का नाम दर्ज करें।",
+      "trainerName": "ट्रेनर का नाम दर्ज करें।",
+      "className": "क्लास का नाम दर्ज करें।",
+      "classDuration": "क्लास की अवधि दर्ज करें।",
+      "classCapacity": "क्लास की क्षमता दर्ज करें।",
+      "openDay": "हफ़्ते में कम से कम एक दिन खुला रखें।",
+      "closingTimeAfterOpening": "{day} का बंद होने का समय खुलने के समय के बाद होना चाहिए।",
+      "saveFailed": "आपका सेटअप सेव नहीं हो सका — अपना कनेक्शन जाँचें और फिर कोशिश करें।"
+    }
+  },
+  "Analytics": {
+    "overview": {
+      "title": "ओवरव्यू",
+      "description": "आपका {business} कैसा चल रहा है — रिस्पॉन्स टाइम, {bookings}, और जिस पर आपका ध्यान चाहिए।",
+      "bookingsThisWeekLabel": "इस हफ़्ते {bookings}",
+      "bookingsThisMonthHint": "इस महीने {count}",
+      "noShowRateLabel": "नो-शो रेट",
+      "last30Days": "पिछले 30 दिन",
+      "medianResponseLabel": "औसत रिस्पॉन्स टाइम",
+      "medianResponseHint": "नए {customer} को पहला जवाब, लगभग।",
+      "conversionLabel": "{customer} → {booking} दर",
+      "last30DaysApprox": "पिछले 30 दिन, लगभग।",
+      "needsAttention": "ध्यान देने योग्य",
+      "needsAttentionHint": "{customers} आपकी टीम का इंतज़ार कर रहे हैं — 'ध्यान देने योग्य' टैब देखें।",
+      "needsAttentionEmpty": "अभी आपकी टीम का इंतज़ार कुछ भी नहीं कर रहा।"
+    },
+    "upcomingToday": {
+      "title": "आज बाकी {bookings}",
+      "viewAll": "सभी देखें",
+      "unnamedCustomer": "अनाम {customer}",
+      "empty": "आज के लिए और कुछ बुक नहीं है।"
+    }
+  },
+  "Billing": {
+    "title": "बिलिंग",
+    "description": "आपका प्लान और इस महीने का उपयोग।",
+    "planLabel": "मौजूदा प्लान",
+    "planTrial": "ट्रायल",
+    "planPro": "प्रो",
+    "planPastDue": "भुगतान बकाया",
+    "planUnknown": "{plan}",
+    "pastDueNotice": "आपका पिछला भुगतान नहीं हो पाया — प्रो प्लान जारी रखने के लिए Stripe पर अपना कार्ड अपडेट करें।",
+    "usageTitle": "इस महीने का उपयोग",
+    "usageDescription": "टोकन गिनती से एक अनुमान है, सटीक बिल नहीं — {month}।",
+    "tokensLabel": "इस्तेमाल किए गए टोकन",
+    "tokensValue": "{input} इनपुट / {output} आउटपुट",
+    "callsLabel": "AI जवाब",
+    "costLabel": "अनुमानित लागत",
+    "upgradeTitle": "प्रो में अपग्रेड करें",
+    "upgradeDescription": "अस्थायी मूल्य — ${price}/माह, लॉन्च से पहले पुष्टि होनी बाकी है।",
+    "upgradeButton": "प्रो में अपग्रेड करें",
+    "upgradeButtonLoading": "रीडायरेक्ट हो रहा है…",
+    "notConfiguredNotice": "इस डिप्लॉयमेंट पर बिलिंग अभी सेट नहीं है — किसी एडमिन से Stripe कनेक्ट करने को कहें।",
+    "checkoutNotConfigured": "इस डिप्लॉयमेंट पर बिलिंग अभी कॉन्फ़िगर नहीं है।",
+    "checkoutGenericError": "चेकआउट शुरू नहीं हो सका — कुछ देर में फिर कोशिश करें।",
+    "checkoutSuccessBanner": "चेकआउट पूरा हुआ — आपका प्लान जल्द ही अपडेट हो जाएगा।",
+    "checkoutCancelledBanner": "चेकआउट रद्द किया गया — आप अभी भी अपने मौजूदा प्लान पर हैं।"
+  }
+}

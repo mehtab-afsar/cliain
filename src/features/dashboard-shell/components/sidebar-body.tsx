@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/features/landing/components/logo-mark";
 import { buildNavItems } from "./nav-items";
@@ -12,7 +15,8 @@ type SidebarBodyProps = {
 };
 
 export function SidebarBody({ isCollapsed, clinicName, labels, onNavigate }: SidebarBodyProps) {
-  const navItems = buildNavItems(labels);
+  const navT = useTranslations("DashboardShell.nav");
+  const navItems = buildNavItems(labels, navT);
   return (
     <div className="flex h-full flex-col gap-6 px-3 py-5">
       <div className={cn("px-2", isCollapsed && "flex justify-center px-0")}>

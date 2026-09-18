@@ -57,6 +57,21 @@ const envSchema = z.object({
   // Error monitoring (sentry.server.config.ts / sentry.edge.config.ts). Optional: Sentry.init
   // no-ops without a DSN, so this is safe to leave unset in local dev.
   SENTRY_DSN: z.string().optional(),
+  // Billing (see src/lib/stripe.ts's getStripeConfig()) — this deployment's own Stripe
+  // account, platform-wide (not per-tenant, unlike WhatsApp/Calendar). No Stripe account
+  // exists yet as of this phase; all three are optional and the whole billing surface
+  // degrades to "not configured" (never a crash) when any is unset. Get these from the
+  // Stripe Dashboard once a real account exists.
+  STRIPE_SECRET_KEY: z.string().optional(),
+  // Signs webhook deliveries to /api/webhooks/stripe (Dashboard → Webhooks → your endpoint →
+  // "Signing secret", starts with "whsec_").
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // The Stripe Price id (starts with "price_") for the Pro plan's recurring monthly price.
+  // PLACEHOLDER PRICING NOTICE: no price has been confirmed by the founder yet — see the
+  // comment on getStripeConfig() in src/lib/stripe.ts for the proposed $49/mo figure and the
+  // reasoning behind it. Create the actual Product/Price in the Stripe Dashboard (or via the
+  // API) once the real number is confirmed, and put its id here.
+  STRIPE_PRICE_ID_PRO: z.string().optional(),
 });
 
 function undefinedIfEmpty(value: string | undefined): string | undefined {
@@ -81,6 +96,9 @@ export const env = envSchema.parse({
   UPSTASH_REDIS_REST_URL: undefinedIfEmpty(process.env.UPSTASH_REDIS_REST_URL),
   UPSTASH_REDIS_REST_TOKEN: undefinedIfEmpty(process.env.UPSTASH_REDIS_REST_TOKEN),
   SENTRY_DSN: undefinedIfEmpty(process.env.SENTRY_DSN),
+  STRIPE_SECRET_KEY: undefinedIfEmpty(process.env.STRIPE_SECRET_KEY),
+  STRIPE_WEBHOOK_SECRET: undefinedIfEmpty(process.env.STRIPE_WEBHOOK_SECRET),
+  STRIPE_PRICE_ID_PRO: undefinedIfEmpty(process.env.STRIPE_PRICE_ID_PRO),
 });
 
 /** The URL Vapi's servers must be able to reach — VAPI_PUBLIC_URL if set, otherwise APP_URL.

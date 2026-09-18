@@ -1,4 +1,7 @@
+"use client";
+
 import { CalendarClock, Clock, Dumbbell, Users } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,12 +21,14 @@ type ClassSetupStepProps = {
 };
 
 export function ClassSetupStep({ value, onChange }: ClassSetupStepProps) {
+  const t = useTranslations("Onboarding.classSetup");
+  const tFields = useTranslations("Onboarding.fields");
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label htmlFor="class-name" className="flex items-center gap-1.5">
           <Dumbbell className="h-3.5 w-3.5 text-muted-foreground" />
-          Class name
+          {t("nameLabel")}
         </Label>
         <Input
           id="class-name"
@@ -37,7 +42,7 @@ export function ClassSetupStep({ value, onChange }: ClassSetupStepProps) {
         <div className="flex flex-col gap-2">
           <Label htmlFor="class-duration" className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            Duration (minutes)
+            {t("durationLabel")}
           </Label>
           <Input
             id="class-duration"
@@ -52,7 +57,7 @@ export function ClassSetupStep({ value, onChange }: ClassSetupStepProps) {
         <div className="flex flex-col gap-2">
           <Label htmlFor="class-capacity" className="flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            Capacity
+            {t("capacityLabel")}
           </Label>
           <Input
             id="class-capacity"
@@ -67,7 +72,7 @@ export function ClassSetupStep({ value, onChange }: ClassSetupStepProps) {
       <div className="flex flex-col gap-2">
         <Label htmlFor="class-day" className="flex items-center gap-1.5">
           <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
-          When it recurs
+          {t("recursLabel")}
         </Label>
         <div className="flex items-center gap-2">
           <Select
@@ -77,7 +82,7 @@ export function ClassSetupStep({ value, onChange }: ClassSetupStepProps) {
             }}
           >
             <SelectTrigger id="class-day" className="w-40">
-              <SelectValue placeholder="Day" />
+              <SelectValue placeholder={tFields("dayPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               {WEEKDAY_LABELS.map((label, dayOfWeek) => (
@@ -87,12 +92,10 @@ export function ClassSetupStep({ value, onChange }: ClassSetupStepProps) {
               ))}
             </SelectContent>
           </Select>
-          <span className="text-sm text-muted-foreground">at</span>
+          <span className="text-sm text-muted-foreground">{tFields("at")}</span>
           <TimeSelect value={value.startTime} onChange={(startTime) => onChange({ startTime })} />
         </div>
-        <p className="text-xs text-muted-foreground">
-          Cliain books this class every week for the next few weeks — you can add more from the dashboard later.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("help")}</p>
       </div>
     </div>
   );

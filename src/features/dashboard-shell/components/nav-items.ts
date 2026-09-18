@@ -1,5 +1,13 @@
 import type { LucideIcon } from "lucide-react";
-import { AlertTriangle, CalendarClock, CalendarRange, MessageCircle, Settings, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CalendarRange,
+  LayoutDashboard,
+  MessageCircle,
+  Settings,
+  Users,
+} from "lucide-react";
 import type { TemplateContent } from "@/features/templates/types";
 
 export type NavItem = {
@@ -9,13 +17,23 @@ export type NavItem = {
   tourId: string;
 };
 
-/** Was a static array — "Patients" is the one nav label that's actually vertical wording
- *  ("Members" for gym-v1), so this is now built from the resolved template's labels instead. */
-export function buildNavItems(labels: TemplateContent["labels"]): NavItem[] {
+/** The static nav copy ("Overview", "Try it out", ...) is looked up via `navT` — a
+ *  `useTranslations("DashboardShell.nav")` translator passed in by the caller — while
+ *  `labels.bookingPlural`/`labels.customerPlural` (the one nav label that's actually vertical
+ *  wording, "Patients" vs "Members") stay exactly as resolveTenantConfig() produced them. Locale
+ *  (this file) and template.labels (vertical terminology) are separate axes on purpose — see
+ *  src/i18n/request.ts's doc comment. */
+export function buildNavItems(labels: TemplateContent["labels"], navT: (key: string) => string): NavItem[] {
   return [
     {
+      href: "/dashboard",
+      label: navT("overview"),
+      icon: LayoutDashboard,
+      tourId: "tour-overview",
+    },
+    {
       href: "/dashboard/try-it",
-      label: "Try it out",
+      label: navT("tryItOut"),
       icon: MessageCircle,
       tourId: "tour-try-it",
     },
@@ -27,17 +45,17 @@ export function buildNavItems(labels: TemplateContent["labels"]): NavItem[] {
     },
     {
       href: "/dashboard/needs-attention",
-      label: "Needs attention",
+      label: navT("needsAttention"),
       icon: AlertTriangle,
       tourId: "tour-needs-attention",
     },
     { href: "/dashboard/patients", label: labels.customerPlural, icon: Users, tourId: "tour-patients" },
     {
       href: "/dashboard/calendar",
-      label: "Calendar",
+      label: navT("calendar"),
       icon: CalendarRange,
       tourId: "tour-calendar",
     },
-    { href: "/dashboard/settings", label: "Settings", icon: Settings, tourId: "tour-settings" },
+    { href: "/dashboard/settings", label: navT("settings"), icon: Settings, tourId: "tour-settings" },
   ];
 }

@@ -13,8 +13,8 @@ export function CloseSection() {
               Your front desk, live in five minutes.
             </h2>
             <p className="mt-3 max-w-[40ch] text-[var(--ink-2)]">
-              Connect the WhatsApp number your clinic already uses. No card, no contract, nothing
-              to replace.
+              Connect the WhatsApp number your business already uses. No card, no contract,
+              nothing to replace.
             </p>
           </div>
           <Link href="/onboarding" className={`${BUTTON.primaryLg} ${FOCUS_RING}`}>

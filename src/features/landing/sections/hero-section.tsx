@@ -17,12 +17,12 @@ export function HeroSection() {
             <h1
               className={`max-w-[11ch] text-[clamp(40px,5.4vw,66px)] leading-[1.02] font-medium tracking-[-0.035em] ${HEADING_FONT}`}
             >
-              Every patient answered. Every booking on your calendar.
+              Every call answered. Every booking on your calendar.
             </h1>
             <p className="mt-[26px] max-w-[44ch] text-[19px] leading-[1.5] text-[var(--ink-2)]">
-              Cliain replies to your clinic&apos;s WhatsApp messages and answers your phone, checks
-              the hours you actually have free, and books the appointment. Patients install
-              nothing. You hire no one.
+              Cliain answers your business&apos;s WhatsApp and phone, checks the hours you actually
+              have free, and books the visit — a patient with a doctor, a member into a class.
+              Nothing for them to install. No one for you to hire.
             </p>
             <div className="mt-[34px] flex flex-wrap items-center gap-3">
               <Link href="/onboarding" className={`${BUTTON.primaryLg} ${FOCUS_RING}`}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useTenantSettings } from "../hooks/use-tenant-settings";
 import { SettingsField } from "./settings-field";
 import { SettingsAuditTrail } from "./settings-audit-trail";
@@ -16,6 +17,7 @@ type SharedSafetySettings = {
 export function SafetyTab({ templateVersion }: { templateVersion: string }) {
   const template = resolveTemplateByVersion(templateVersion);
   const { settings, reload } = useTenantSettings<SharedSafetySettings>();
+  const t = useTranslations("Settings.safety");
   if (!settings) return null;
 
   const scriptField = template.safetyScriptField;
@@ -23,27 +25,25 @@ export function SafetyTab({ templateVersion }: { templateVersion: string }) {
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
-      <p className="text-sm text-muted-foreground">
-        Who the AI hands a conversation off to, and what it says on a possible emergency.
-      </p>
+      <p className="text-sm text-muted-foreground">{t("intro")}</p>
 
       <SettingsField
         field="safety.escalationWhatsappNumber"
-        label="Escalation WhatsApp number"
+        label={t("escalationLabel")}
         initialValue={settings.safety.escalationWhatsappNumber ?? ""}
         defaultValue=""
-        placeholder="Staff number to alert on a handoff"
-        help="They'll get a message for emergencies and anything the AI can't handle."
+        placeholder={t("escalationPlaceholder")}
+        help={t("escalationHelp")}
         onSaved={reload}
       />
       <SettingsField
         field={`safety.${scriptField}`}
-        label="Emergency guidance"
+        label={t("scriptLabel")}
         multiline
         initialValue={scriptValue}
         defaultValue=""
         placeholder={DEFAULT_EMERGENCY_SCRIPT}
-        help="Sent word-for-word on a possible emergency — not paraphrased by the AI."
+        help={t("scriptHelp")}
         onSaved={reload}
       />
 

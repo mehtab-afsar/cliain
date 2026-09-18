@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +61,8 @@ export function IntegrationCard({
   const [values, setValues] = useState<Record<string, string>>({});
   const [justSaved, setJustSaved] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
+  const t = useTranslations("Settings.integrations");
+  const tCommon = useTranslations("Common");
 
   async function handleCopyWebhookUrl() {
     if (!webhookUrl?.value) return;
@@ -104,11 +107,11 @@ export function IntegrationCard({
           {connected ? (
             <Badge variant="outline" className="gap-1 text-success">
               <Check className="h-3 w-3" />
-              Connected
+              {t("connected")}
             </Badge>
           ) : (
             <Badge variant="outline" className="text-muted-foreground">
-              Not connected
+              {t("notConnected")}
             </Badge>
           )}
         </div>
@@ -135,7 +138,7 @@ export function IntegrationCard({
                   id={field.key}
                   type={field.secret ? "password" : "text"}
                   placeholder={
-                    field.secret && connected ? "•••••••• (unchanged)" : field.placeholder
+                    field.secret && connected ? t("secretUnchangedPlaceholder") : field.placeholder
                   }
                   value={values[field.key] ?? ""}
                   onChange={(event) =>
@@ -150,7 +153,7 @@ export function IntegrationCard({
           {webhookUrl ? (
             <details className="group rounded-md border border-border">
               <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground select-none group-open:text-foreground">
-                Advanced
+                {t("advanced")}
               </summary>
               <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
                 <Label className="text-xs">{webhookUrl.label}</Label>
@@ -164,15 +167,13 @@ export function IntegrationCard({
                       variant="outline"
                       size="icon"
                       onClick={handleCopyWebhookUrl}
-                      aria-label="Copy webhook URL"
+                      aria-label={t("copyWebhookUrl")}
                     >
                       {justCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Set APP_URL in your deployment to see this clinic&apos;s webhook URL.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t("webhookUrlMissing")}</p>
                 )}
               </div>
             </details>
@@ -190,13 +191,13 @@ export function IntegrationCard({
               disabled={isSaving}
             >
               <X className="h-4 w-4" />
-              Disconnect
+              {t("disconnect")}
             </Button>
           ) : (
             <span />
           )}
           <Button type="submit" size="sm" disabled={isSaving}>
-            {isSaving ? "Saving…" : justSaved ? "Saved ✓" : "Save"}
+            {isSaving ? tCommon("saving") : justSaved ? tCommon("saved") : tCommon("save")}
           </Button>
         </CardFooter>
       </form>

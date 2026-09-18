@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,14 +31,15 @@ export function SettingsField({
   onSaved,
 }: SettingsFieldProps) {
   const { value, setValue, commit, status, error } = useSettingsField(field, initialValue, onSaved);
+  const t = useTranslations("Common");
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={field}>{label}</Label>
         <div className="flex items-center gap-3 text-xs">
-          {status === "saving" ? <span className="text-muted-foreground">Saving…</span> : null}
-          {status === "saved" ? <span className="text-success">Saved ✓</span> : null}
+          {status === "saving" ? <span className="text-muted-foreground">{t("saving")}</span> : null}
+          {status === "saved" ? <span className="text-success">{t("saved")}</span> : null}
           {defaultValue !== undefined && value !== defaultValue ? (
             <button
               type="button"
@@ -47,7 +49,7 @@ export function SettingsField({
                 commit(defaultValue);
               }}
             >
-              Reset to default
+              {t("resetToDefault")}
             </button>
           ) : null}
         </div>

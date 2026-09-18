@@ -1,4 +1,7 @@
+"use client";
+
 import { Dumbbell, MessageCircle, UserRound } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TrainerProfile } from "../types";
@@ -9,12 +12,14 @@ type TrainerProfileStepProps = {
 };
 
 export function TrainerProfileStep({ value, onChange }: TrainerProfileStepProps) {
+  const t = useTranslations("Onboarding.trainerProfile");
+  const tFields = useTranslations("Onboarding.fields");
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label htmlFor="trainer-name" className="flex items-center gap-1.5">
           <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
-          Trainer name
+          {t("nameLabel")}
         </Label>
         <Input
           id="trainer-name"
@@ -27,7 +32,7 @@ export function TrainerProfileStep({ value, onChange }: TrainerProfileStepProps)
       <div className="flex flex-col gap-2">
         <Label htmlFor="trainer-role" className="flex items-center gap-1.5">
           <Dumbbell className="h-3.5 w-3.5 text-muted-foreground" />
-          Role
+          {t("roleLabel")}
         </Label>
         <Input
           id="trainer-role"
@@ -40,7 +45,7 @@ export function TrainerProfileStep({ value, onChange }: TrainerProfileStepProps)
       <div className="flex flex-col gap-2">
         <Label htmlFor="trainer-whatsapp" className="flex items-center gap-1.5">
           <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
-          WhatsApp number
+          {tFields("whatsappNumberLabel")}
         </Label>
         <Input
           id="trainer-whatsapp"
@@ -49,10 +54,7 @@ export function TrainerProfileStep({ value, onChange }: TrainerProfileStepProps)
           value={value.whatsappNumber}
           onChange={(event) => onChange({ whatsappNumber: event.target.value })}
         />
-        <p className="text-xs text-muted-foreground">
-          Don&apos;t have this yet? Leave it blank — you can connect WhatsApp
-          later from Settings.
-        </p>
+        <p className="text-xs text-muted-foreground">{tFields("whatsappHelp")}</p>
       </div>
     </div>
   );
